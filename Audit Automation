@@ -1,0 +1,40 @@
+# Web-based Application Audit Automation Tool
+
+**Automated User Audit Report Generation for a Web-Base Application Platform**
+
+A desktop GUI tool built with **Python**, **PyQt5**, **Selenium**, **xlwings**, and **Pandas** to automate the auditing of user accounts in the Corrigo work order management system.
+
+### Purpose
+This tool streamlines a previously manual, time-consuming process:
+- Searches for client accounts in Corrigo
+- Applies specific filters (including suspended users and last login date)
+- Exports user reports to Excel
+- Runs post-processing Excel macros to flag issues
+- Saves flagged outputs for review
+
+It significantly reduces audit time from hours to minutes per client.
+
+### Features
+- Clean PyQt5 GUI for selecting input files and output folders
+- Secure login handling via configuration (supports QA/Prod environments)
+- Robust Selenium automation with retry logic and window handling
+- Integration with Excel via xlwings to trigger VBA macros
+- Processes multiple accounts in batch from an input macro-enabled workbook
+- Downloads and processes exported reports automatically
+- Status tracking directly in the input Excel file
+
+### Technologies Used
+- **Python 3.x**
+- PyQt5 – GUI framework
+- Selenium WebDriver – Browser automation
+- xlwings – Excel automation and macro execution
+- Pandas – Data processing
+- XML parsing for configuration
+
+### Screenshot
+
+
+### How to Run (Demo Instructions)
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
