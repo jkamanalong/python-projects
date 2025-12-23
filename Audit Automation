@@ -187,8 +187,8 @@ class FileAndFolderSelector(QWidget):
             self.login_Corrigo(res_dict_config, fldpath, download_folder)
             #Logs into the Corrigo system.
             if user.lower() == 'kenneth.manalong': #Testing purposes
-                username = 'kenneth.manalong@jll.com'
-                password = 'Stage@123'
+                username = 'sample.user@jll.com'
+                password = 'sample_stagepassword123'
                 submit_xpath = '//input[@type=\'submit\']'
                 user_xpath = '//*[@id=\'UserName\']'
                 pass_xpath = '//*[@id=\'Password\']'
