@@ -6,7 +6,7 @@ A desktop GUI tool built with **Python**, **PyQt5**, **Selenium**, **xlwings**, 
 
 ### Purpose
 This tool streamlines a previously manual, time-consuming process:
-- Searches for client accounts in Corrigo
+- Searches for inactive users in each Corrigo accounts
 - Applies specific filters (including suspended users and last login date)
 - Exports user reports to Excel
 - Runs post-processing Excel macros to flag issues
@@ -23,13 +23,14 @@ It significantly reduces audit time from hours to minutes per client.
 - Downloads and processes exported reports automatically
 - Status tracking directly in the input Excel file
 
-### Technologies Used
-- **Python 3.x**
-- PyQt5 – GUI framework
-- Selenium WebDriver – Browser automation
-- xlwings – Excel automation and macro execution
-- Pandas – Data processing
-- XML parsing for configuration
+### Key Libraries and Their Roles
+To understand how to write this script, you need to know the libraries it uses:
+- PyQt5: Creates a graphical user interface (GUI) with text fields, buttons, and labels for file/folder selection and running the automation.
+- Selenium: Automates web browser interactions (e.g., logging into Corrigo, clicking buttons, entering text, downloading files).
+- xlwings: Interacts with Excel files programmatically, including running macros and updating cell values.
+- pandas: Handles Excel data manipulation, such as reading and merging data from input files.
+- os, shutil, getpass, time: Manage file system operations (e.g., creating directories, deleting files), retrieve the current user, and introduce delays for web interactions.
+- xml.etree.ElementTree: Parses an XML configuration file (Corrigo.xml) to load environment-specific settings (e.g., URL, QA/dev environment).
 
 ### How to Run (Demo Instructions)
 1. Install dependencies:
