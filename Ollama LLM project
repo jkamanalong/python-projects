@@ -1,0 +1,349 @@
+# Black Box — Incident Intelligence Tool
+
+**AI-Powered Incident Analysis & Enrichment for Facilities Management**
+
+A cutting-edge desktop application built with **Python** that transforms raw incident descriptions into structured, actionable intelligence using local LLMs (via Ollama) and optional self-learning capabilities.
+
+This "Black Box" tool analyzes thousands of facility maintenance incidents in minutes — extracting summaries, identifying broken assets, classifying problems, and assessing business impact — all while producing **clean, professional Excel outputs** ready for reporting and dashboards.
+
+### Business Impact
+- Reduced incident triage and analysis time from **hours to minutes**
+- Enabled data-driven root cause analysis across thousands of work orders
+- Automatically identified critical assets (e.g., "Chiller #2", "AHU-05") and failure modes
+- Created clean, dashboard-ready datasets without manual tagging
+- Built a self-improving system through human-in-the-loop feedback
+
+### Key Features
+- **Sleek PyQt5 GUI** with progress tracking and intuitive workflow
+- **Local AI processing** via Ollama (Llama 3.2) — no cloud costs or data exposure
+- **Hybrid intelligence**:
+  - LLM for rich fields (Summary, Asset Name, Asset Type, Problem)
+  - Optional ML model (v2) for fast binary classifications
+- **Self-learning loop**:
+  - Review app shows only misclassified rows
+  - One-click corrections feed back into training data
+  - Retrain model to improve accuracy over time
+- **Professional output**:
+  - Clean column names (no suffixes)
+  - ID column moved to front
+  - Handles duplicate columns gracefully
+- **Zero external dependencies** beyond Ollama (runs fully offline after setup)
+
+### Technologies Used
+- **Python 3** – Core language
+- **PyQt5** – Modern desktop GUI with threading
+- **pandas** – Excel handling and data manipulation
+- **Ollama** – Local LLM inference (Llama 3.2)
+- **scikit-learn + joblib** – Self-learning classification (v2)
+- **openpyxl** – Robust Excel I/O
+
+### How It Works
+1. Load an Excel file containing incident descriptions
+2. Select description columns and optional ID column
+3. Click "START ULTIMATE ANALYSIS"
+4. Tool processes each row locally:
+   - Concatenates & cleans description text
+   - Prompts LLM for structured extraction
+   - (v2) Applies trained ML for faster binary fields
+5. Outputs enriched Excel with new columns:
+   - Summary
+   - With/Without Issue?
+   - Business Impact?
+   - Asset Broken?
+   - Asset
+   - Asset Type
+   - Problem
+6. Use Review App to correct errors → retrain model → improve future runs
+
+### Setup & Installation
+
+1. Install Ollama and pull model:
+   ```bash
+   ollama pull llama3.2:latest
+
+
+### Python Code
+
+
+# main.py 
+import sys
+import os
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+import pandas as pd
+
+'''
+How to run: 
+1. open terminal
+2. type in 'ollama list'
+3. type in 'curl http://localhost:11434'
+4. run
+'''
+ 
+# Auto-load v2 if exists
+try:
+    from processor_v2 import SelfLearningProcessor as IncidentProcessor
+    print("BLACK BOX v2 (Self-Learning + Asset Detection) — LOADED")
+except ImportError:
+    print("v2 not available → using v1")
+    from processor import IncidentProcessor
+ 
+class ProcessingThread(QThread):
+    progress = pyqtSignal(int)
+    finished = pyqtSignal(object)
+ 
+    def __init__(self, input_path, sheet, desc_columns, id_col, output_path):
+        super().__init__()
+        self.input_path = input_path
+        self.sheet = sheet
+        self.desc_columns = desc_columns
+        self.id_col = id_col
+        self.output_path = output_path
+ 
+    def run(self):
+        try:
+            df = pd.read_excel(self.input_path, sheet_name=self.sheet)
+ 
+            # Fix duplicate columns
+            cols = []
+            seen = {}
+            for col in df.columns:
+                col_str = str(col)
+                if col_str in seen:
+                    seen[col_str] += 1
+                    cols.append(f"{col_str}_{seen[col_str]}")
+                else:
+                    seen[col_str] = 0
+                    cols.append(col_str)
+            df.columns = cols
+ 
+            processor = IncidentProcessor()
+            enriched = processor.process_dataframe(df, self.desc_columns, self.progress.emit)
+ 
+            result_df = df.copy()
+            for col in enriched.columns:
+                result_df[col] = enriched[col]  # ← NO MORE "(AI)" suffix if you want even cleaner
+ 
+            # Optional: Remove "(AI)" suffix for ultimate clean look
+            result_df.columns = [c.replace(" (AI)", "") for c in result_df.columns]
+ 
+            # Move ID to front
+            if self.id_col and self.id_col in result_df.columns:
+                cols_order = [self.id_col] + [c for c in result_df.columns if c != self.id_col]
+                result_df = result_df[cols_order]
+ 
+            result_df.to_excel(self.output_path, index=False)
+            self.finished.emit(result_df)
+ 
+        except Exception as e:
+            import traceback
+            print("ERROR:", traceback.format_exc())
+            self.finished.emit(None)
+ 
+ 
+# ====================== GUI (Clean & Final) ======================
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Black Box — Ultimate Incident Intelligence")
+        self.setGeometry(100, 100, 900, 700)
+        self.current_df_columns = []
+        self.init_ui()
+ 
+    def init_ui(self):
+        w = QWidget()
+        lay = QVBoxLayout()
+        w.setLayout(lay)
+        self.setCentralWidget(w)
+ 
+        h1 = QHBoxLayout()
+        self.lbl_file = QLabel("No file selected")
+        btn_browse = QPushButton("Browse Excel File")
+        btn_browse.clicked.connect(self.browse_file)
+        h1.addWidget(self.lbl_file); h1.addWidget(btn_browse)
+        lay.addLayout(h1)
+ 
+        h2 = QHBoxLayout()
+        h2.addWidget(QLabel("Sheet:"))
+        self.cb_sheet = QComboBox()
+        h2.addWidget(self.cb_sheet)
+        lay.addLayout(h2)
+ 
+        lay.addWidget(QLabel("Description Columns (add multiple):"))
+        self.list_columns = QListWidget()
+        lay.addWidget(self.list_columns)
+        btn_add = QPushButton("Add Description Column...")
+        btn_add.clicked.connect(self.add_description_column)
+        lay.addWidget(btn_add)
+ 
+        h3 = QHBoxLayout()
+        h3.addWidget(QLabel("ID Column (optional):"))
+        self.cb_id = QComboBox()
+        self.cb_id.addItem("(None)")
+        h3.addWidget(self.cb_id)
+        lay.addLayout(h3)
+ 
+        h4 = QHBoxLayout()
+        self.lbl_out = QLabel("No output selected")
+        btn_out = QPushButton("Save Results As...")
+        btn_out.clicked.connect(self.save_output)
+        h4.addWidget(self.lbl_out); h4.addWidget(btn_out)
+        lay.addLayout(h4)
+ 
+        self.progress = QProgressBar()
+        lay.addWidget(self.progress)
+ 
+        self.btn_start = QPushButton("START ULTIMATE ANALYSIS")
+        self.btn_start.setStyleSheet("background-color:#D32F2F; color:white; font-size:20px; padding:20px; font-weight:bold;")
+        self.btn_start.clicked.connect(self.start_processing)
+        lay.addWidget(self.btn_start, alignment=Qt.AlignCenter)
+ 
+    def browse_file(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Open Excel", "", "Excel Files (*.xlsx *.xls)")
+        if path:
+            self.input_path = path
+            self.lbl_file.setText(os.path.basename(path))
+            xl = pd.ExcelFile(path)
+            self.cb_sheet.clear()
+            self.cb_sheet.addItems(xl.sheet_names)
+            self.cb_sheet.currentTextChanged.connect(lambda s: self.update_columns(path, s) if s else None)
+            self.update_columns(path, xl.sheet_names[0])
+ 
+    def update_columns(self, path, sheet):
+        df = pd.read_excel(path, sheet_name=sheet, nrows=0)
+        self.current_df_columns = df.columns.tolist()
+        self.cb_id.clear()
+        self.cb_id.addItem("(None)")
+        self.cb_id.addItems(self.current_df_columns)
+        self.list_columns.clear()
+ 
+    def add_description_column(self):
+        if not self.current_df_columns:
+            QMessageBox.warning(self, "Warning", "Load file first")
+            return
+        col, ok = QInputDialog.getItem(self, "Select Column", "Add description column:", self.current_df_columns, 0, False)
+        if ok and col:
+            items = [self.list_columns.item(i).text() for i in range(self.list_columns.count())]
+            if col not in items:
+                self.list_columns.addItem(col)
+ 
+    def save_output(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Save Results", "", "Excel Files (*.xlsx)")
+        if path:
+            self.output_path = path
+            self.lbl_out.setText(os.path.basename(path))
+ 
+    def start_processing(self):
+        if not hasattr(self, 'input_path') or not hasattr(self, 'output_path'):
+            QMessageBox.warning(self, "Missing", "Select files")
+            return
+        desc_cols = [self.list_columns.item(i).text() for i in range(self.list_columns.count())]
+        if not desc_cols:
+            QMessageBox.warning(self, "Missing", "Add description column")
+            return
+ 
+        self.btn_start.setEnabled(False)
+        self.progress.setValue(0)
+ 
+        self.thread = ProcessingThread(
+            self.input_path,
+            self.cb_sheet.currentText(),
+            desc_cols,
+            self.cb_id.currentText() if self.cb_id.currentText() != "(None)" else None,
+            self.output_path
+        )
+        self.thread.progress.connect(self.progress.setValue)
+        self.thread.finished.connect(self.on_finished)
+        self.thread.start()
+ 
+    def on_finished(self, data):
+        self.progress.setValue(100)
+        if data is None:
+            QMessageBox.critical(self, "Error", "Processing failed — check console")
+        else:
+            result_df = data
+            QMessageBox.information(self, "BLACK BOX — MISSION ACCOMPLISHED",
+                f"Processed {len(result_df):,} incidents\n"
+                f"Clean, professional output generated\n"
+                f"Summary + Asset + Problem + Type included\n\n"
+                f"Saved: {self.output_path}")
+        self.btn_start.setEnabled(True)
+ 
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    win = MainWindow()
+    win.show()
+    sys.exit(app.exec_())
+
+
+
+# processor.py 
+import pandas as pd
+import re
+import ollama
+ 
+class IncidentProcessor:
+    def clean_and_concat(self, row, desc_columns):
+        parts = []
+        for col in desc_columns:
+            if col in row and pd.notna(row[col]):
+                text = str(row[col])
+                text = re.sub(r'\s+', ' ', text)
+                text = re.sub(r'[^\w\s\.,;:!?\(\)/\-+@#&]', '', text)
+                parts.append(text.strip())
+        return " ".join(parts)
+ 
+    def ensemble_extract(self, full_text, row):
+        if not full_text.strip():
+            full_text = "No description"
+ 
+        prompt = f"""
+You are a senior facilities engineer. Analyze this incident and return ONLY valid JSON:
+ 
+{{
+    "Summary (AI)": "Professional 1-sentence summary (max 20 words)",
+    "With/Without Issue?": "With Issue or Without Issue",
+    "Business Impact?": "Yes or No",
+    "Asset Broken?": "Yes or No",
+    "Asset (AI)": "Exact asset name if broken (e.g., Chiller #2, AHU-05, Generator Day Tank) or blank",
+    "Asset Type (AI)": "One word: Chiller, AHU, Generator, Pump, UPS, Lighting, etc. or blank",
+    "Problem (AI)": "One keyword: Leak, No Cooling, Tripped, Overload, False Alarm, etc. or blank"
+}}
+ 
+Description: "{full_text[:4000]}"
+"""
+ 
+        try:
+            resp = ollama.generate(
+                model="llama3.2:latest",
+                prompt=prompt,
+                options={"temperature": 0.15, "num_predict": 500}
+            )
+            raw = resp['response']
+            start = raw.index("{")
+            end = raw.rindex("}") + 1
+            data = eval(raw[start:end])
+        except Exception as e:
+            print("LLM failed:", e)
+            data = {}
+ 
+        return {
+            "Summary (AI)": data.get("Summary (AI)", "Summary failed"),
+            "With/Without Issue?": data.get("With/Without Issue?", "With Issue"),
+            "Business Impact?": data.get("Business Impact?", "No"),
+            "Asset Broken?": data.get("Asset Broken?", "Yes"),
+            "Asset (AI)": data.get("Asset (AI)", ""),
+            "Asset Type (AI)": data.get("Asset Type (AI)", ""),
+            "Problem (AI)": data.get("Problem (AI)", "")
+        }
+ 
+    def process_dataframe(self, df, desc_columns, progress_callback=None):
+        results = []
+        total = len(df)
+        for idx, row in df.iterrows():
+            full_text = self.clean_and_concat(row, desc_columns)
+            structured = self.ensemble_extract(full_text, row)
+            results.append(structured)
+            if progress_callback:
+                progress_callback(int((idx + 1) / total * 100))
+        return pd.DataFrame(results)
