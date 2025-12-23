@@ -1,0 +1,1349 @@
+# Roles & Permissions Audit Automation Tool
+
+**Automated Compliance Audit for Roles, Privileges & User Assignments**
+
+A sophisticated desktop automation tool built with **Python** that performs comprehensive security and compliance audits across multiple client accounts in a web-based service management platform.
+
+This "Roles Audit Automation" tool automatically extracts role configurations, AP status mappings, admin user assignments, and key system settings — then compares them against a predefined baseline to identify deviations, unauthorized privileges, and non-compliant user-role assignments.
+
+
+### Business Impact
+- Reduced full role & permissions audit cycle from **days to under an hour**
+- Identified hundreds of misconfigured roles and unauthorized privilege assignments
+- Ensured consistent security posture across global client portfolio
+- Provided visual evidence (screenshots) and color-coded Excel reports for audit trails
+- Enforced least-privilege principles and segregation of duties automatically
+
+### Key Features
+- **Minimalist PyQt5 GUI** — single file input for baseline reference
+- **Batch processing** of dozens of client accounts from an Excel list
+- **Selenium automation** with robust navigation, export triggering, and error recovery
+- **Smart download handling** using `webdriver-manager` (no manual ChromeDriver needed)
+- **Automated export** of:
+  - Role privileges
+  - AP status transition mappings
+  - Admin user list with assigned roles
+- **Advanced comparison logic** against baseline:
+  - Detects extra/missing privileges
+  - Identifies roles with incorrect AP status transitions
+  - Flags non-compliant user-role assignments
+- **Special audit rules** for privileged roles (e.g., only designated users allowed as System Admins or Platform Analysts)
+- **Evidence collection**:
+  - Targeted screenshots of critical settings using keyboard simulation
+  - Table data extraction from Service Pro and Global Configuration pages
+- **Rich Excel output** (`audit_results.xlsx`) with:
+  - Multiple sheets for different findings
+  - Color-coded rows (red = risks, green = compliant, blue = missing)
+  - Timestamped results for audit traceability
+
+### Technologies Used
+- **Python 3** – Core language
+- **PyQt5** – Clean desktop GUI
+- **Selenium + webdriver-manager** – Reliable browser automation
+- **pandas** – Data processing and Excel export
+- **openpyxl** – Advanced Excel reading/writing and conditional formatting
+- **PIL (Pillow)** – Screenshot processing
+- **keyboard** – Simulated Ctrl+F for precise screenshot targeting
+- **re, datetime, os/shutil** – File management and key normalization
+
+### How It Works (High-Level Flow)
+1. User selects a **reference Excel file** containing:
+   - List of accounts to audit
+   - Baseline role-privilege mappings
+   - Baseline AP status transitions
+   - Authorized user lists for privileged roles
+2. Tool launches Chrome and logs into the platform (manual login for security)
+3. For each account:
+   - Navigates to client context
+   - Exports three critical datasets
+   - Captures screenshots of key configuration settings
+   - Extracts visible table data for financial and password policies
+4. After all exports:
+   - Compares exported roles vs baseline
+   - Validates user-role assignments against governance rules
+   - Generates comprehensive, color-coded audit report
+
+### Setup & Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/roles-audit-automation-tool.git
+   cd roles-audit-automation-tool
+
+
+### Python Code
+
+#06-07-2025: Written by John Kenneth Manalong
+#This code is written to automate the audit process of Roles
+import sys, json, getpass, os, shutil, time, re
+import pandas as pd
+import xml.etree.ElementTree as ET
+from webdriver_manager.chrome import ChromeDriverManager
+from datetime import datetime
+
+#Excel Manipulation
+import openpyxl
+from openpyxl.styles import PatternFill
+
+import keyboard  # For keyboard operations
+from PIL import Image  # For image handling
+from io import BytesIO
+
+#Selenium
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import WebDriverException
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
+
+#PyQt5
+from PyQt5 import QtCore
+from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QSize
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QFileDialog, QVBoxLayout, QHBoxLayout, QComboBox, QMessageBox
+
+
+class Auditor(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+        
+    def init_ui(self):
+        self.setStyleSheet('background-color: #dee2e6;')
+        self.ref_file_path_input = QLineEdit()
+        self.ref_file_path_input.setStyleSheet('background-color: white')
+        self.ref_file_browse_button = QPushButton('Browse File')
+        self.ref_file_browse_button.setStyleSheet('background-color: #c1121f; color: white;')
+        self.ref_file_browse_button.clicked.connect(self.get_file_pathExcel)
+        self.run_button = QPushButton('Run')
+        self.run_button.clicked.connect(self.print_values)
+        self.run_button.setStyleSheet('background-color: #c1121f; color: white;')
+        layout = QVBoxLayout(self)
+        self.title_label = QLabel('Corrigo Audit Automation Tool')
+        self.title_label.setStyleSheet('font-size: 40px; background-color: white;')
+        self.title_label.setAlignment(Qt.AlignHCenter)
+        layout.addWidget(self.title_label)
+        layout.addWidget(QLabel('<span style=\'font-size: 12pt;\'>Reference File:</span>'))
+        layout.addWidget(self.ref_file_path_input)
+        layout.addWidget(self.ref_file_browse_button)
+        layout.addWidget(self.run_button)
+        self.setWindowTitle('Corrigo Audit Automation Tool')
+        self.setFixedSize(800,700)
+        self.setLayout(layout)
+
+    def get_file_pathExcel(self):
+        file_path, _= QFileDialog.getOpenFileName(self, 'Select Excel File','', 'Excel Files (*.xlsx);;All Files (*)')
+        #Opens a file dialog for selecting Excel Files
+        if file_path:
+            if file_path.endswith('.xlsx'):
+                self.ref_file_path_input.setText(file_path)
+            else:
+                QMessageBox.information(self, 'Information', 'Select Excel File')
+                #This line shows an information to the user to select an excel file
+
+    def print_values(self):
+        user = getpass.getuser() #Gets the current username.
+        fldpath = os.getcwd() #Gets the directory path of the current script.
+        ref_file = self.ref_file_path_input.text()
+        print(ref_file)
+        if ref_file == '':
+            QMessageBox.information(self, 'Information', 'Please select all fields')
+            return
+        ref_file_name = os.path.basename(ref_file)
+        file_name = os.path.basename(ref_file)
+        account_list = self.account_list_prep(ref_file)
+        print(account_list)
+        print('\nThe total number of accounts to be audited is '+ str(len(account_list)))
+
+        bpriv_dict = self.privileges_baseline_prep(ref_file, 'Privilege')
+        bapfrom_dict, bapto_dict = self.baseline_apstatus_prep(ref_file, 'AP Status')
+        #Baseline Data is established!!!
+
+        dosc_list = self.cpa_list_prep(ref_file,'DOSC') #SC Corrigo Platform Analyst
+        on_account_list = self.cpa_list_prep(ref_file,'On-account') #Corrigo Platform Analyst
+        sys_admins = self.cpa_list_prep(ref_file,'System admins') #SC Governance System Admin
+        #CPA Data is established!!! These users are the only ones allowed to have CPA roles.
+        
+
+        #Auto navigation starts here
+        if len(account_list)>0:
+            res_dict_config = {"url": "https://login.corrigo.com/connect/login?client_id=servicecenter"}
+            run_st = "Yes"
+            # Rename download folder to "Processing Folder"
+            processing_folder = os.path.join(fldpath, 'Processing Folder')
+            
+            # Handle the case if "Downloaded Reports" folder already exists
+            old_folder = os.path.join(fldpath, 'Downloaded Reports')
+            if os.path.exists(old_folder):
+                # If both folders exist, handle migration
+                if os.path.exists(processing_folder):
+                    # Move any files from old folder to processing folder
+                    for item in os.listdir(old_folder):
+                        old_path = os.path.join(old_folder, item)
+                        if os.path.isfile(old_path):
+                            new_path = os.path.join(processing_folder, item)
+                            shutil.move(old_path, new_path)
+                    # Remove old folder after migration
+                    shutil.rmtree(old_folder)
+                else:
+                    # Just rename the folder
+                    os.rename(old_folder, processing_folder)
+            else:
+                # Ensure processing folder exists
+                self.create_directory(processing_folder)
+                
+            # Create Reports folder if it doesn't exist
+            reports_folder = os.path.join(fldpath, 'Reports')
+            self.create_directory(reports_folder)
+            
+            self.login_Corrigo(res_dict_config, fldpath, processing_folder)
+            drop_down = "//span[@class='caret big-caret ']"
+            self.click_on_elem(drop_down,'Drop-down selector')
+            sys_ad = "//span[@title='JLL NA Governance System Admin']"
+            self.click_on_elem(sys_ad,"Sys Admin")
+            all_results = {
+            "privileges": [],
+            "ap_from": [],
+            "ap_to": []
+            }
+            all_user_role_results = []
+            all_table_data = []
+            for account in account_list:
+                print('Processing Account : ', account)
+                search_field_xpath = '//input[@type=\'search\']'
+                self.add_text(search_field_xpath, account, 'Searching account')
+                #//div[@class='select-option-text' and contains(text(), 'JLL British Telecom')]
+                xpath_reponse = '//div[@class=\'select-option-text\' and contains(text(),\''+account+'\')]'
+                xpath_noresult = '//div[@class=\'no-result-found\']'
+                try:
+                    if browser.find_element(By.XPATH, xpath_noresult):
+                        continue
+                except Exception as e:
+                    print(str(e))
+                
+                search_result = browser.find_element(By.XPATH, xpath_reponse)
+                main_page = browser.current_window_handle
+                search_result.click()
+                self.window_switch(main_page)
+                #Switches to a new browser window.
+                keep_going = True
+                Checking = True
+                while keep_going == True:
+                    try:
+                        txt_entire = browser.find_element(By.XPATH, '/html/body').get_attribute('innerText')
+                        print('Fetching entirepage text')
+                        keep_going = False
+                    except WebDriverException:
+                        if Checking == True:
+                            print('Fetching entirepage text')
+                            Checking = False
+                if 'An Error Has Occurred' in txt_entire:
+                    browser.close()
+                    browser.switch_to.window(main_page)
+                    error_one = 'Error in Page'
+                    continue
+                else:
+                    close_pendo = "//button[@class='btn btn-default id-btn-close']"
+                    try:
+                        time.sleep(5)
+                        if browser.find_element(By.XPATH, close_pendo):
+                            self.click_on_elem(close_pendo, 'Splash Message Close Button')
+                    except Exception as e:
+                        print('No splash message found: ' + str(e))
+
+                    try:
+                        time.sleep(1)
+                        if browser.find_element(By.LINK_TEXT, 'More'):
+                            self.click_on_elem_byLinkText('More','More text')
+                    except Exception as e:
+                        print('No more field found: ' + str(e))
+
+                    # Empty the processing folder but save files to Reports folder before deletion
+                    self.empty_folder(processing_folder)
+                    
+                    self.click_on_elem_byLinkText('Admin & Settings', 'Admin Settings')
+                    self.click_on_elem_byLinkText('Users and Roles', 'Users and Roles')
+                    self.click_on_elem_byLinkText('Manage Roles', 'Manage Roles')
+
+                    # First export
+                    self.click_on_elem('//div/span[@class=\'arrow\']', 'Dropdown')
+                    self.click_on_elem('//li/a/span[@class=\'area-action icon-download\' and @data-action=\'RoleGrid_export_roles\']', 'Roles Export Button')
+                    time.sleep(3)
+                    # Check for internal server error after first export
+                    try:
+                        time.sleep(5)
+                        error_element = browser.find_element(By.XPATH, "//*[contains(text(), 'Internal Server Error')]")
+                        print('Internal Server Error encountered for Roles Export, but proceeding...')
+                        self.click_on_elem('//button[@class=\'btn btn-default id-btn-close\']','Close')
+                    except Exception:
+                        print('No error for Roles Export')                    
+
+                    # Second export
+                    self.click_on_elem('//div/span[@class=\'arrow\']', 'Dropdown')
+                    self.click_on_elem('//li/a/span[@class=\'area-action icon-download\' and @data-action=\'RoleGrid_export_invoice_statuses\']', 'AP Statuses Export Button')
+                    time.sleep(3)
+                    # Check for internal server error after second export
+                    try:
+                        time.sleep(5)
+                        error_element = browser.find_element(By.XPATH, "//*[contains(text(), 'Internal Server Error')]")
+                        print('Internal Server Error encountered for AP Status Export, but proceeding...')
+                        self.click_on_elem('//button[@class=\'btn btn-default id-btn-close\']','Close')
+                    except Exception:
+                        print('No error for AP Status Export')
+                    time.sleep(3)
+
+
+                    self.export_admin_users()
+
+                    #Get table data starts here
+                    table_data = self.get_table_data(account)
+                    all_table_data.extend(table_data)
+                    
+                    browser.close()
+                    browser.switch_to.window(main_page)
+
+                    #Renaming of the files - files will already be copied to Reports folder by empty_folder()
+                    found, filedownloaded = self.check_file_downlaoded(processing_folder, account)
+                    print(filedownloaded)
+
+                    fnamerole = 'CorrigoRoleData'
+                    fnameapstatus = 'CorrigoLnkRoleApStatusData'
+                    fnameusers = 'CorrigoEmployeeData'
+
+                    # Check if there are any downloaded files
+                    if not filedownloaded:
+                        print("No files were downloaded")
+                        continue
+                        # Handle the error case appropriately
+                        
+                    else:
+                        ppriv_dict = {}
+                        papfrom_dict = {}
+                        papto_dict = {}
+                        pusers_list = []
+                        p_role_list = []
+                        p_users_role_dict = {}
+                        # Process the files after they're downloaded
+                        for file_path in filedownloaded:
+                            print(f"Examining file: {file_path}")
+                            
+                            if fnamerole in file_path:
+                                ppriv_dict = self.privileges_baseline_prep(file_path, 'Export')
+                                print(f"Processed role data from {file_path} - found {len(ppriv_dict)} roles")
+                            
+                            elif fnameapstatus in file_path:
+                                papfrom_dict, papto_dict = self.baseline_apstatus_prep(file_path, 'Export')
+                                print(f"Processed AP status data from {file_path} - found {len(papfrom_dict)} roles with From status and {len(papto_dict)} roles with To status")
+                            
+                            elif fnameusers in file_path:
+                                print(f"Processing admin users data from {file_path}")
+                                try:
+                                    wb = openpyxl.load_workbook(file_path)
+                                    print(f"Sheets in file: {wb.sheetnames}")
+                                    
+                                    # Check what columns are in the first sheet
+                                    first_sheet = wb[wb.sheetnames[0]]
+                                    headers = [cell.value for cell in next(first_sheet.iter_rows(min_row=1, max_row=1))]
+                                    print(f"Headers in first row: {headers}")
+                                    
+                                    p_user_list, p_role_list, p_users_role_dict = self.export_col_list(file_path, 'Export')
+                                    print(f"Extracted {len(p_user_list)} users and {len(p_role_list)} roles")
+                                    
+                                    if p_users_role_dict:
+                                        print(f"First 3 user-role pairs: {dict(list(p_users_role_dict.items())[:3])}")
+                                        
+                                        # Add new audit check for user roles
+                                        user_roles_results = self.audit_user_roles(
+                                            p_users_role_dict, 
+                                            dosc_list, 
+                                            on_account_list, 
+                                            sys_admins,
+                                            account
+                                        )
+                                        print(f"User roles audit found {len(user_roles_results)} results")
+                                        
+                                        if not user_roles_results.empty:
+                                            all_user_role_results.append(user_roles_results)
+                                            print(f"Added {len(user_roles_results)} rows to audit results")
+                                        else:
+                                            print("No non-compliant users found in audit")
+                                    else:
+                                        print("No user-role pairs extracted from file")
+                                        
+                                except Exception as e:
+                                    print(f"Error processing admin users file: {str(e)}")
+                            else:
+                                print(f"Unrecognized file pattern: {file_path}")
+                        if ppriv_dict and (papfrom_dict or papto_dict):
+                            comparison_results = self.perform_comparisons(
+                                account, ppriv_dict, papfrom_dict, papto_dict,
+                                bpriv_dict, bapfrom_dict, bapto_dict
+                            )
+                            all_results["privileges"].append(comparison_results["privileges"])
+                            all_results["ap_from"].append(comparison_results["ap_from"])
+                            all_results["ap_to"].append(comparison_results["ap_to"])
+
+
+            # After all accounts processed, export ONCE
+            if all_results["privileges"]:
+                # Convert all user role results to a single DataFrame
+                all_user_roles_df = pd.DataFrame()
+                if all_user_role_results:
+                    all_user_roles_df = pd.concat(all_user_role_results, ignore_index=True)
+                
+                # Export everything to Excel
+                self.export_comparison_to_excel(
+                    self.flatten(all_results, "privileges"),
+                    self.flatten(all_results, "ap_from"),
+                    self.flatten(all_results, "ap_to"),
+                    all_user_roles_df,  # Add the user roles DataFrame
+                    all_table_data,     # Add the table data
+                    filename="audit_results.xlsx"
+                )
+                self.colorize_excel("audit_results.xlsx")
+
+    def get_table_data(self, acc):
+        """
+        Extract table data from Service Pro Settings and Global Configuration
+        
+        Args:
+            acc: Account name
+            
+        Returns:
+            List of dictionaries with extracted data
+        """
+        data = []
+        screenshot_folder = os.path.join(os.getcwd(), 'Screenshots')
+        self.create_directory(screenshot_folder)
+        
+        try:
+            time.sleep(2)
+            if browser.find_element(By.LINK_TEXT, 'More'):
+                self.click_on_elem_byLinkText('More','More text')
+        except Exception as e:
+            print('No \'More\' field found: ' + str(e))
+
+        self.click_on_elem_byLinkText('Admin & Settings', 'Admin Settings')
+        self.click_on_elem('//a[contains(text(),\'Service Pros\') and @data-type=\'3\']', 'Service Pros')
+        self.click_on_elem_byLinkText('Settings', 'Settings')
+
+        time.sleep(2)
+
+        # Title Cells Service Pro Settings
+        t_01 = '//td[@class=\'gc-WonWorkflowAndRequirementsSettingsFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Require unique invoice #\')]'
+        t_02 = '//td[@class=\'gc-WonWorkflowAndRequirementsSettingsFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Require financial coding\')]'
+
+        title_first_page = [t_01, t_02]
+
+        for title_cell_xpath in title_first_page:
+            try:
+                title_field = browser.find_element(By.XPATH, title_cell_xpath)
+                value_xpath = './following-sibling::td[@class=\'gc-WonWorkflowAndRequirementsSettingsFpoGrid-settingsValue left type-grid_string type-url type-styled  k-table-td\' and @aria-colindex=\'2\']'
+                value_field = title_field.find_element(By.XPATH, value_xpath)
+                title_text = title_field.text
+                value_text = value_field.text
+            except Exception as e:
+                print(f"Error processing {acc}: {str(e)}")
+                title_text = 'error found'
+                value_text = 'error found'
+
+            data.append({
+                'Account Name': acc,
+                'Title Cell': title_text,
+                'Value Cell': value_text
+            })
+        
+        # Take Screenshot - Service Pro Settings
+        try:
+            # Use Ctrl+F to search
+            keyboard.press_and_release('ctrl+f')
+            time.sleep(1)
+            # Type in search text
+            keyboard.write('Required documents status for invoice submission')
+            time.sleep(1)
+            keyboard.press_and_release('enter')
+            time.sleep(1)
+            # Take screenshot
+            screenshot = browser.get_screenshot_as_png()
+            # Save screenshot
+            img = Image.open(BytesIO(screenshot))
+            screenshot_path = os.path.join(screenshot_folder, f"{acc}_Service_Pro_Settings.png")
+            img.save(screenshot_path)
+            print(f"Screenshot saved to {screenshot_path}")
+        except Exception as e:
+            print(f"Error taking Service Pro Settings screenshot: {str(e)}")
+
+        # Navigate to Global Configuration
+        try:
+            time.sleep(2)
+            if browser.find_element(By.LINK_TEXT, 'More'):
+                self.click_on_elem_byLinkText('More','More text')
+        except Exception as e:
+            print('No more field found: ' + str(e))
+
+        self.click_on_elem_byLinkText('Admin & Settings', 'Admin Settings')
+        self.click_on_elem_byLinkText('Global Configuration', 'Global Configuration')
+        self.click_on_elem_byLinkText('Settings & Terminology', 'Settings & Terminology')
+
+        time.sleep(2)
+        
+        # Title Cells Global Settings
+        t_03 = '//td[@class=\'gc-FinancialSettingsFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Role restriction on financial statuses\')]'
+        t_04 = '//td[@class=\'gc-FinancialSettingsFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Restrict creator from authorizing\')]'
+        t_05 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Expiration\')]'
+        t_06 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Length\')]'
+        t_07 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Disallow past\')]'
+        t_08 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Complexity\')]'
+        t_09 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Max attempts\')]'
+        t_10 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Lockout time\')]'
+        t_11 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Session timeout\')]'
+        t_12 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Admin sets temp password\')]'
+        t_13 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Role restrictions through ranking\')]'
+        t_14 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Require email address\')]'
+        t_15 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Password expiration alert\')]'
+        t_16 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Send password expiration alert\')]'
+        t_17 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Password expiration content\')]'
+
+        title_second_page = [t_03, t_04, t_05, t_06, t_07, t_08, t_09, t_10, t_11, t_12, t_13, t_14, t_15, t_16, t_17]
+
+        for title_cell_xpath in title_second_page:
+            try:
+                title_field = browser.find_element(By.XPATH, title_cell_xpath)
+                
+                # Determine which xpath pattern to use for the value field
+                if 'FinancialSettingsFpoGrid' in title_cell_xpath:
+                    value_xpath = './following-sibling::td[@class=\'gc-FinancialSettingsFpoGrid-settingsValue left type-grid_string type-url type-styled  k-table-td\' and @aria-colindex=\'2\']'
+                else:
+                    value_xpath = './following-sibling::td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingsValue left type-grid_string type-url type-styled  k-table-td\' and @aria-colindex=\'2\']'
+                    
+                value_field = title_field.find_element(By.XPATH, value_xpath)
+                title_text = title_field.text
+                value_text = value_field.text
+            except Exception as e:
+                print(f"Error processing {acc}: {str(e)}")
+                title_text = 'error found'
+                value_text = 'error found'
+
+            data.append({
+                'Account Name': acc,
+                'Title Cell': title_text,
+                'Value Cell': value_text
+            })
+                
+        # Take Screenshot - Role restriction
+        try:
+            keyboard.press_and_release('ctrl+f')
+            time.sleep(1)
+            keyboard.write('Role restriction on financial statuses')
+            time.sleep(1)
+            keyboard.press_and_release('enter')
+            time.sleep(1)
+            screenshot = browser.get_screenshot_as_png()
+            img = Image.open(BytesIO(screenshot))
+            screenshot_path = os.path.join(screenshot_folder, f"{acc}_Financial.png")
+            img.save(screenshot_path)
+            print(f"Screenshot saved to {screenshot_path}")
+        except Exception as e:
+            print(f"Error taking Role Restriction screenshot: {str(e)}")
+        
+        # Take Screenshot - Expiration
+        # Navigate to Global Configuration
+        try:
+            time.sleep(2)
+            if browser.find_element(By.LINK_TEXT, 'More'):
+                self.click_on_elem_byLinkText('More','More text')
+        except Exception as e:
+            print('No more field found: ' + str(e))
+
+        self.click_on_elem_byLinkText('Admin & Settings', 'Admin Settings')
+        self.click_on_elem_byLinkText('Global Configuration', 'Global Configuration')
+        self.click_on_elem_byLinkText('Settings & Terminology', 'Settings & Terminology')
+
+        time.sleep(2)
+        try:
+            keyboard.press_and_release('ctrl+f')
+            time.sleep(1)
+            keyboard.write('Lockout time')
+            time.sleep(1)
+            keyboard.press_and_release('enter')
+            time.sleep(1)
+            screenshot = browser.get_screenshot_as_png()
+            time.sleep(3)
+            img = Image.open(BytesIO(screenshot))
+            screenshot_path = os.path.join(screenshot_folder, f"{acc}_User Password and Role Policy.png")
+            img.save(screenshot_path)
+            print(f"Screenshot saved to {screenshot_path}")
+        except Exception as e:
+            print(f"Error taking User/Password screenshot: {str(e)}")
+
+        return data
+    
+    def export_admin_users(self):
+        """Export Admin Users data from the Import/Export section"""
+        try:
+            time.sleep(1)
+            if browser.find_element(By.LINK_TEXT, 'More'):
+                self.click_on_elem_byLinkText('More','More text')
+        except Exception as e:
+            print('No more field found: ' + str(e))
+            
+        # Navigate to Import/Export
+        self.click_on_elem_byLinkText('Users', 'Users')
+        self.click_on_elem_byLinkText('Manage', 'Manage')
+        time.sleep(2)
+
+        #Click Dropdown arrow
+        arrow_drop = '//div[@class=\'area-actions-container area-actions-widget\']/div[@class=\'main-action\']/span[@class=\'arrow\']'
+        self.click_on_elem(arrow_drop, 'Drop-down arrow')
+
+        #Download File
+        export_xpath = '//a[contains(text(),\'Admin Export\')]/span[@class=\'area-action icon-download\']'
+        self.click_on_elem(export_xpath, 'Admin Export')
+
+        # Click Export button - use the click_on_elem method for consistency
+        export_butt = '//button[@class="btn btn-primary id-btn-save" and contains(text(), "Export")]'
+        self.click_on_elem(export_butt, 'Export Button')
+        
+
+        try:
+            
+            # Check initial file count in download folder
+            download_folder = os.path.join(os.getcwd(), 'Downloaded Reports')
+            initial_files = set(os.listdir(download_folder))
+            print(f"Initial file count in download folder: {len(initial_files)}")
+            
+            # Wait for download to complete
+            print("Admin Users export initiated, waiting for download to complete...")
+            max_wait_time = 120  # seconds
+            wait_interval = 2  # seconds
+            total_waited = 0
+            download_complete = False
+            
+            while not download_complete and total_waited < max_wait_time:
+                time.sleep(wait_interval)
+                total_waited += wait_interval
+                
+                # Check for new files
+                current_files = set(os.listdir(download_folder))
+                new_files = current_files - initial_files
+                
+                # Look for Excel files among the new files
+                new_excel_files = [f for f in new_files if f.endswith('.xlsx')]
+                
+                # Also check for temporary download files
+                temp_download_files = [f for f in new_files if f.endswith('.crdownload') or f.endswith('.part')]
+                
+                if new_excel_files and not temp_download_files:
+                    # New Excel file(s) exist and no temporary files - download likely complete
+                    print(f"Download complete. New Excel files: {new_excel_files}")
+                    download_complete = True
+                else:
+                    print(f"Waiting for download... ({total_waited}s elapsed)")
+                    # If we see temp files, we know download is in progress
+                    if temp_download_files:
+                        print(f"Download in progress: {temp_download_files}")
+            
+            if not download_complete:
+                print(f"Warning: Timed out after {max_wait_time}s waiting for download to complete")
+            else:
+                print(f"Admin Users export completed successfully after {total_waited}s")
+            
+            # Additional wait to ensure file system operations complete
+            time.sleep(3)
+            
+        except Exception as e:
+            print(f"Error exporting Admin Users: {e}")
+
+    def export_col_list(self, ref, sheet):
+        wb = openpyxl.load_workbook(ref)
+        
+        # Handle case where sheet name might be different
+        if sheet not in wb.sheetnames:
+            print(f"Sheet '{sheet}' not found. Available sheets: {wb.sheetnames}")
+            if len(wb.sheetnames) > 0:
+                sheet = wb.sheetnames[0]
+                print(f"Using first available sheet: {sheet}")
+            else:
+                return [], [], {}
+        
+        sheet = wb[sheet]
+        max_row = sheet.max_row
+        users_list = []
+        role_list = []
+        user_role_dict = {}
+        
+        # Look for columns with similar names
+        userID_index = None
+        role_index = None
+        
+        # Check first 3 rows for headers to handle multi-row headers
+        for row_idx in range(1, min(4, max_row + 1)):
+            for cell in sheet[row_idx]:
+                if cell.value:
+                    # Case-insensitive matching
+                    cell_value = str(cell.value).lower()
+                    if userID_index is None and ('userid' in cell_value or 'user id' in cell_value or 'username' in cell_value):
+                        userID_index = cell.column
+                        print(f"Found UserID column: {cell.value} at column {cell.column}")
+                    elif role_index is None and 'role' in cell_value:
+                        role_index = cell.column
+                        print(f"Found Role column: {cell.value} at column {cell.column}")
+        
+        if userID_index is None or role_index is None:
+            print(f"Required columns not found! Sample of first row: {[cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]}")
+            return [], [], {}
+        
+        # Build users and roles dict - start from row after the header
+        start_row = min(4, max_row + 1)  # Assuming header could be in first 3 rows
+        for i in range(start_row, max_row + 1):
+            user = sheet.cell(row=i, column=userID_index).value
+            role = sheet.cell(row=i, column=role_index).value
+            
+            if user and role:  # Skip rows with empty values
+                users_list.append(user)
+                role_list.append(role)
+                user_role_dict[user] = role
+        
+        print(f"Extracted {len(user_role_dict)} user-role pairs")
+        return users_list, role_list, user_role_dict
+        
+    def cpa_list_prep(self, ref, sheet):
+        wb = openpyxl.load_workbook(ref)
+        sheet = wb[sheet]
+        max_row = sheet.max_row
+        cpa_list = []
+        for i in range(1, max_row + 1):
+            cpa_list.append(sheet.cell(row=i, column=1).value)
+        return cpa_list
+
+    def account_list_prep(self, ref):
+        wb = openpyxl.load_workbook(ref)
+        sheet = wb["Accounts"]
+        max_row = sheet.max_row
+        account_list = []
+        for i in range(1, max_row + 1):
+            account_list.append(sheet.cell(row=i, column=1).value)
+        return account_list
+
+    def privileges_baseline_prep(self, ref, sheet):
+        wb = openpyxl.load_workbook(ref)
+        sheet = wb[sheet]
+        
+        # Initialize variables
+        priv_start_index = None
+        role_col = None
+        
+        # Find the column indices for 'SecurityGroup-1' and 'Name'
+        for row in sheet.iter_rows(min_row=1, max_row=2):  # Assuming headers are in first 2 rows
+            for cell in row:
+                if cell.value == 'SecurityGroup-1':
+                    priv_start_index = cell.column
+                elif cell.value == 'Name':
+                    role_col = cell.column
+        
+        # Check if we found the required columns
+        if priv_start_index is None or role_col is None:
+            print("Required columns 'SecurityGroup-1' or 'Name' not found!")
+            return {}
+        
+        # Build the privilege dictionary
+        priv_dict = {}
+        for i in range(3, sheet.max_row + 1):  # Start from row 3
+            role_name = sheet.cell(row=i, column=role_col).value
+            if role_name is None:  # Skip empty role names
+                continue
+                
+            priv_list = []
+            for j in range(priv_start_index, sheet.max_column + 1):
+                cell_value = sheet.cell(row=i, column=j).value
+                # Only add non-empty values
+                if cell_value:
+                    priv_list.append(cell_value)
+            
+            # Add to dictionary with role name as key and privilege list as value
+            priv_dict[role_name] = priv_list
+        
+        return priv_dict
+
+    def baseline_apstatus_prep(self, ref, sheet):
+        # Initialize the dictionaries
+        apfrom_dict = {}
+        apto_dict = {}
+        
+        wb = openpyxl.load_workbook(ref)
+        sheet = wb[sheet]
+        
+        ap_from_start = None
+        ap_from_end = None
+        ap_to_start = None
+        ap_to_end = None
+        role_col = None
+
+        # First pass: find all columns with relevant prefixes
+        ap_from_columns = []
+        ap_to_columns = []
+
+        for row in sheet.iter_rows(min_row=1, max_row=2):  # Assuming headers are in first 2 rows
+            for cell in row:
+                if cell.value:
+                    if 'APStatusFrom-' in str(cell.value):
+                        ap_from_columns.append((cell.column, int(str(cell.value).split('-')[1])))
+                    elif 'APStatusTo-' in str(cell.value):
+                        ap_to_columns.append((cell.column, int(str(cell.value).split('-')[1])))
+                    elif cell.value == 'RoleName':
+                        role_col = cell.column
+
+        # Sort by the number after the dash
+        ap_from_columns.sort(key=lambda x: x[1])
+        ap_to_columns.sort(key=lambda x: x[1])
+
+        # Set start and end columns if we found any matches
+        if ap_from_columns:
+            ap_from_start = ap_from_columns[0][0]
+            ap_from_end = ap_from_columns[-1][0]
+
+        if ap_to_columns:
+            ap_to_start = ap_to_columns[0][0]
+            ap_to_end = ap_to_columns[-1][0]
+        
+        # Check if we found all required columns
+        if None in (ap_from_start, ap_from_end, ap_to_start, ap_to_end, role_col):
+            print("One or more required columns not found in AP Status sheet!")
+            return {}, {}
+        
+        # Process APStatusFrom values
+        for i in range(3, sheet.max_row + 1):  # Start from row 3
+            role_name = sheet.cell(row=i, column=role_col).value
+            if role_name is None:  # Skip empty role names
+                continue
+                
+            apfrom_list = []
+            for j in range(ap_from_start, ap_from_end + 1):
+                cell_value = sheet.cell(row=i, column=j).value
+                # Only add non-empty values
+                if cell_value:
+                    apfrom_list.append(cell_value)
+            
+            # Add to dictionary with role name as key and ap status from list as value
+            apfrom_dict[role_name] = apfrom_list
+
+        # Process APStatusTo values
+        for i in range(3, sheet.max_row + 1):  # Start from row 3
+            role_name = sheet.cell(row=i, column=role_col).value
+            if role_name is None:  # Skip empty role names
+                continue
+                
+            apto_list = []
+            for j in range(ap_to_start, ap_to_end + 1):
+                cell_value = sheet.cell(row=i, column=j).value
+                # Only add non-empty values
+                if cell_value:
+                    apto_list.append(cell_value)
+            
+            # Add to dictionary with role name as key and ap status to list as value
+            apto_dict[role_name] = apto_list
+            
+        return (apfrom_dict, apto_dict)
+
+    def login_Corrigo(self, res_dict_config, fldpath, download_folder):
+        global browser
+        self.create_directory(download_folder)
+        
+        # Create Reports folder to store processed files
+        reports_folder = os.path.join(fldpath, 'Reports')
+        self.create_directory(reports_folder)
+        
+        APPLICATION_URL = res_dict_config['url']
+        
+        # Create options object
+        options = Options()
+        options.add_argument('--no-sandbox')
+        prefs = {'download.default_directory': download_folder}
+        options.add_experimental_option('prefs', prefs)
+        
+        try:
+            # Initialize Chrome browser using webdriver_manager
+            # This automatically downloads the correct driver for your Chrome version
+            browser = webdriver.Chrome(options=options)
+            
+            print('Current session is {}'.format(browser.session_id))
+            browser.maximize_window()
+            main_window = browser.current_window_handle
+            browser.switch_to.window(main_window)
+            browser.get(APPLICATION_URL)
+            return browser
+            
+        except Exception as e:
+            error_message = f'Failed to initialize Chrome: {str(e)}'
+            QMessageBox.critical(self, 'Error', error_message)
+            print(error_message)
+            return None
+
+    # Removed redundant method since it's now handled in baseline_apstatus_prep
+
+    def create_directory(self, directory_path):
+        if not os.path.exists(directory_path):
+            os.makedirs(directory_path)
+
+    def add_text(self, xpath, value, message):
+        keep_going = True
+        Checking = True
+        while keep_going == True:
+            try:
+                input_field = browser.find_element(By.XPATH, xpath)
+                input_field.clear()
+                input_field.send_keys(value)
+                print(message, ' Fetched')
+                keep_going = False
+            except WebDriverException:
+                if Checking == True:
+                    print(message, ' Account NOT FETCHED')
+                    Checking = False
+                    #This function attempts to find an element by XPath, 
+                    # clear its content, and input new text. 
+                    # It uses a loop to retry in case of WebDriverException.
+
+    def click_on_elem_byLinkText(self, linktext, text):
+        keep_going = True
+        Checking = True
+        while keep_going == True:
+            try:
+                field = browser.find_element(By.LINK_TEXT, linktext)
+                field.click()
+                print(text + ' button clicked')
+                keep_going = False
+            except WebDriverException:
+                if Checking == True:
+                    print(text + ' button not Clicked')
+                    Checking = False
+
+    def click_on_elem(self, submit_xpath, text):
+        keep_going = True
+        Checking = True
+        while keep_going == True:
+            try:
+                username_field = browser.find_element(By.XPATH, submit_xpath)
+                username_field.click()
+                print(text + ' button clicked')
+                keep_going = False
+            except WebDriverException:
+                if Checking == True:
+                    print(text + ' button not Clicked')
+                    Checking = False
+
+    def window_switch(self, main_page):
+        for handle in browser.window_handles:
+            if handle != main_page:
+                print(handle)
+                newpage = handle
+                break
+        browser.switch_to.window(newpage)
+        #This function switches the browser's focus to a new window. 
+        #It iterates through all open window handles 
+        # and switches to the first one that's not the main page.
+
+
+    def check_file_downlaoded(self, folder_path, account_name):
+        files = os.listdir(folder_path)
+        found = 'No'
+        downloaded_files = []
+        
+        if not files:  # If there are no files in the folder
+            return found, downloaded_files
+        
+        # List of expected file patterns
+        expected_patterns = [
+            "CorrigoRoleData",
+            "CorrigoLnkRoleApStatusData", 
+            "CorrigoEmployeeData"
+        ]
+        
+        for file in files:
+            if file.endswith('.xlsx'):
+                # Check if this is one of our expected files
+                if any(pattern in file for pattern in expected_patterns):
+                    original_path = os.path.join(folder_path, file)
+                    
+                    # Create new filename with account name prefix
+                    new_filename = f"{account_name} - {file}"
+                    new_path = os.path.join(folder_path, new_filename)
+                    
+                    # Rename the file
+                    try:
+                        os.rename(original_path, new_path)
+                        downloaded_files.append(new_path)
+                        found = 'Yes'
+                        print(f"Renamed file: {file} to {new_filename}")
+                    except Exception as e:
+                        print(f"Error renaming file: {e}")
+        
+        return found, downloaded_files
+
+
+    def empty_folder(self, folder_path):
+        """
+        Empty the processing folder but save files to a 'Reports' folder before deletion
+        """
+        # Create Reports folder if it doesn't exist
+        reports_folder = os.path.join(os.getcwd(), 'Reports')
+        self.create_directory(reports_folder)
+        
+        for item in os.listdir(folder_path):
+            item_path = os.path.join(folder_path, item)
+            try:
+                if os.path.isfile(item_path):
+                    # Copy file to Reports folder before deleting
+                    dest_path = os.path.join(reports_folder, item)
+                    shutil.copy2(item_path, dest_path)
+                    print(f'Saved file to Reports: {item}')
+                    
+                    # Delete from processing folder
+                    os.unlink(item_path)
+                elif os.path.isdir(item_path):
+                    # For any subfolders, just remove them
+                    shutil.rmtree(item_path)
+            except Exception as e:
+                print(f'Error processing {item_path}: {e}')
+
+    def key_cleaning(self, key):
+        """
+        Clean keys by replacing trailing digits with 'X' except for '999'
+        
+        Args:
+            key: String key to be cleaned
+            
+        Returns:
+            Cleaned key with trailing digits replaced by 'X' except for '999'
+        """
+        if not key:
+            return key
+            
+        # First, protect '999' by temporarily replacing it
+        key = key.replace('999', '__PRESERVE_999__')
+        
+        # Match digits at the end of the string
+        cleaned_key = re.sub(r'\d+$', lambda m: 'X' * len(m.group(0)), key)
+        
+        # Restore '999'
+        cleaned_key = cleaned_key.replace('__PRESERVE_999__', '999')
+        
+        return cleaned_key
+
+    def compare_dictionaries(self, account, p_dict, b_dict, dict_type):
+        """
+        Compare privileges or AP status dictionaries between exported and baseline data
+        
+        Args:
+            account: Account name for reporting
+            p_dict: Dictionary from processed file
+            b_dict: Baseline dictionary for comparison
+            dict_type: Type of dictionary (privilege, apfrom, apto)
+            
+        Returns:
+            Dictionary with comparison results
+        """
+        comparison_results = {
+            'account': account,
+            'dict_type': dict_type,
+            'matching_roles': [],
+            'missing_roles': [],
+            'extra_roles': [],
+            'roles_with_differences': []
+        }
+        
+        # Clean and normalize keys from both dictionaries
+        p_keys = {self.key_cleaning(k): k for k in p_dict.keys()}
+        b_keys = {self.key_cleaning(k): k for k in b_dict.keys()}
+        
+        # Find roles in both dictionaries
+        common_clean_keys = set(p_keys.keys()) & set(b_keys.keys())
+        
+        # Find roles only in processed data
+        extra_clean_keys = set(p_keys.keys()) - set(b_keys.keys())
+        
+        # Find roles only in baseline
+        missing_clean_keys = set(b_keys.keys()) - set(p_keys.keys())
+        
+        # Track matching roles and roles with differences
+        for clean_key in common_clean_keys:
+            original_p_key = p_keys[clean_key]
+            original_b_key = b_keys[clean_key]
+            
+            # Compare the values (privileges or AP statuses)
+            p_values = sorted(p_dict[original_p_key])
+            b_values = sorted(b_dict[original_b_key])
+            
+            if p_values == b_values:
+                comparison_results['matching_roles'].append({
+                    'processed_key': original_p_key,
+                    'baseline_key': original_b_key
+                })
+            else:
+                comparison_results['roles_with_differences'].append({
+                    'processed_key': original_p_key,
+                    'baseline_key': original_b_key,
+                    'processed_values': p_values,
+                    'baseline_values': b_values,
+                    'differences': {
+                        'only_in_processed': [v for v in p_values if v not in b_values],
+                        'only_in_baseline': [v for v in b_values if v not in p_values]
+                    }
+                })
+        
+        # Track missing roles
+        for clean_key in missing_clean_keys:
+            original_b_key = b_keys[clean_key]
+            comparison_results['missing_roles'].append({
+                'baseline_key': original_b_key,
+                'baseline_values': b_dict[original_b_key]
+            })
+        
+        # Track extra roles
+        for clean_key in extra_clean_keys:
+            original_p_key = p_keys[clean_key]
+            comparison_results['extra_roles'].append({
+                'processed_key': original_p_key,
+                'processed_values': p_dict[original_p_key]
+            })
+        
+        return comparison_results
+
+    def perform_comparisons(self, account, ppriv_dict, papfrom_dict, papto_dict, 
+                            bpriv_dict, bapfrom_dict, bapto_dict):
+        """
+        Perform all dictionary comparisons and generate reports
+        
+        Args:
+            account: Account name
+            ppriv_dict, papfrom_dict, papto_dict: Dictionaries from exported data
+            bpriv_dict, bapfrom_dict, bapto_dict: Baseline dictionaries
+        """
+        results = {}
+        
+        # Compare privileges
+        priv_results = self.compare_dictionaries(account, ppriv_dict, bpriv_dict, 'privileges')
+        results['privileges'] = priv_results
+        
+        # Compare AP From statuses
+        apfrom_results = self.compare_dictionaries(account, papfrom_dict, bapfrom_dict, 'ap_from')
+        results['ap_from'] = apfrom_results
+        
+        # Compare AP To statuses
+        apto_results = self.compare_dictionaries(account, papto_dict, bapto_dict, 'ap_to')
+        results['ap_to'] = apto_results
+        
+        # Print summary
+        self.print_comparison_summary(account, results)
+        
+        # Return the full results for later use (e.g., writing to file)
+        return results
+
+    def print_comparison_summary(self, account, results):
+        """
+        Print summary of comparison results
+        
+        Args:
+            account: Account name
+            results: Dictionary with comparison results
+        """
+        print(f"\n===== COMPARISON SUMMARY FOR {account} =====")
+        
+        for dict_type, result in results.items():
+            print(f"\n--- {dict_type.upper()} COMPARISON ---")
+            print(f"Matching roles: {len(result['matching_roles'])}")
+            print(f"Missing roles: {len(result['missing_roles'])}")
+            print(f"Extra roles: {len(result['extra_roles'])}")
+            print(f"Roles with differences: {len(result['roles_with_differences'])}")
+            
+            if result['roles_with_differences']:
+                print("\nDetails for roles with differences:")
+                for diff in result['roles_with_differences'][:3]:  # Show first 3 differences
+                    print(f"  - Processed role: {diff['processed_key']}, Baseline role: {diff['baseline_key']}")
+                    print(f"    Only in processed: {len(diff['differences']['only_in_processed'])}")
+                    print(f"    Only in baseline: {len(diff['differences']['only_in_baseline'])}")
+                
+                if len(result['roles_with_differences']) > 3:
+                    print(f"    ... and {len(result['roles_with_differences']) - 3} more roles with differences")
+
+
+    def export_comparison_to_excel(self, priv_df, apfrom_df, apto_df, user_roles_df=None, table_data=None, filename="audit_results.xlsx"):
+        with pd.ExcelWriter(filename) as writer:
+            priv_df.to_excel(writer, sheet_name='Priv Results', index=False)
+            apfrom_df.to_excel(writer, sheet_name='AP From Res', index=False)
+            apto_df.to_excel(writer, sheet_name='AP To Res', index=False)
+            
+            if user_roles_df is not None and not user_roles_df.empty:
+                user_roles_df.to_excel(writer, sheet_name='Users-Role', index=False)
+            
+            # Add the new Table Data sheet if data exists
+            if table_data:
+                # Convert list of dictionaries to DataFrame
+                table_df = pd.DataFrame(table_data)
+                table_df.to_excel(writer, sheet_name='Table Data', index=False)
+    def result_to_df(self, result):
+        data = []
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        account = result.get('account', '')
+        for entry in result['roles_with_differences']:
+            data.append({
+                'Timestamp': now,
+                'Account': account,
+                'Processed Role': entry['processed_key'],
+                'Baseline Role': entry['baseline_key'],
+                'Only in Processed': ', '.join(entry['differences']['only_in_processed']),
+                'Only in Baseline': ', '.join(entry['differences']['only_in_baseline']),
+                'Matching Values': ', '.join([val for val in entry['processed_values'] if val in entry['baseline_values']])
+            })
+        for entry in result['matching_roles']:
+            data.append({
+                'Timestamp': now,
+                'Account': account,
+                'Processed Role': entry['processed_key'],
+                'Baseline Role': entry['baseline_key'],
+                'Only in Processed': '',
+                'Only in Baseline': '',
+                'Matching Values': 'All (perfect match)'
+            })
+        for entry in result['extra_roles']:
+            data.append({
+                'Timestamp': now,
+                'Account': account,
+                'Processed Role': entry['processed_key'],
+                'Baseline Role': '',
+                'Only in Processed': ', '.join(entry['processed_values']),
+                'Only in Baseline': '',
+                'Matching Values': ''
+            })
+        for entry in result['missing_roles']:
+            data.append({
+                'Timestamp': now,
+                'Account': account,
+                'Processed Role': '',
+                'Baseline Role': entry['baseline_key'],
+                'Only in Processed': '',
+                'Only in Baseline': ', '.join(entry['baseline_values']),
+                'Matching Values': ''
+            })
+        return pd.DataFrame(data)
+
+    # Example usage in your code:
+    # comparison_results = perform_comparisons(...)
+    # export_comparison_to_excel(comparison_results['privileges'], comparison_results['ap_from'], comparison_results['ap_to'])
+
+    def flatten(self, all_results, key):
+        return pd.concat([self.result_to_df(res) for res in all_results[key]], ignore_index=True)
+
+    def colorize_excel(self, filename):
+        wb = openpyxl.load_workbook(filename)
+        for ws in wb.worksheets:
+            # Get column indexes by header name
+            headers = {cell.value: idx for idx, cell in enumerate(next(ws.iter_rows(min_row=1, max_row=1)), start=1)}
+            
+            if ws.title in ['Priv Results', 'AP From Res', 'AP To Res']:
+                for row in ws.iter_rows(min_row=2):
+                    only_proc = row[headers['Only in Processed']-1].value if 'Only in Processed' in headers else ''
+                    only_base = row[headers['Only in Baseline']-1].value if 'Only in Baseline' in headers else ''
+                    matching = row[headers['Matching Values']-1].value if 'Matching Values' in headers else ''
+                    if only_proc:
+                        for cell in row:
+                            cell.fill = PatternFill(start_color="FFFFB3B3", end_color="FFFFB3B3", fill_type = "solid")
+                    elif only_base:
+                        for cell in row:
+                            cell.fill = PatternFill(start_color="FFB3B3FF", end_color="FFB3B3FF", fill_type = "solid")
+                    elif matching:
+                        for cell in row:
+                            cell.fill = PatternFill(start_color="FFB3FFB3", end_color="FFB3FFB3", fill_type = "solid")
+            
+            # Add coloring for Users-Role sheet
+            elif ws.title == 'Users-Role':
+                if 'Expected Role' in headers and 'Is Conforming' in headers:
+                    for row in ws.iter_rows(min_row=2):
+                        expected_role = row[headers['Expected Role']-1].value
+                        is_conforming = row[headers['Is Conforming']-1].value
+                        
+                        # Special case: If expected role is "No role defined in baseline", use green
+                        if expected_role == "No role defined in baseline":
+                            for cell in row:
+                                cell.fill = PatternFill(start_color="FFB3FFB3", end_color="FFB3FFB3", fill_type = "solid")
+                        # Otherwise use the normal logic
+                        elif is_conforming == "No":
+                            for cell in row:
+                                cell.fill = PatternFill(start_color="FFFFB3B3", end_color="FFFFB3B3", fill_type = "solid")
+                        else:
+                            for cell in row:
+                                cell.fill = PatternFill(start_color="FFB3FFB3", end_color="FFB3FFB3", fill_type = "solid")
+                
+        wb.save(filename)
+
+    def audit_user_roles(self, p_users_role_dict, dosc_list, on_account_list, sys_admins, account_name):
+        """
+        Audit user roles against defined rules
+        
+        Args:
+            p_users_role_dict: Dictionary mapping users to their assigned roles
+            dosc_list: List of users who should have 'SC Corrigo Platform Analyst' role
+            on_account_list: List of users who should have 'Corrigo Platform Analyst' role
+            sys_admins: List of users who should have 'SC Governance System Admin' role
+            account_name: Account name for reporting
+            
+        Returns:
+            DataFrame with nonconforming users and recommended role changes
+        """
+        results = []
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        for user, role in p_users_role_dict.items():
+            expected_role = None
+            is_conforming = False
+            
+            # Check Rule 1: Users in DOSC list
+            if user in dosc_list:
+                expected_role = "SC Corrigo Platform Analyst"
+                is_conforming = (role == expected_role)
+            
+            # Check Rule 2: Users in on-account list
+            elif user in on_account_list:
+                expected_role = "Corrigo Platform Analyst"
+                is_conforming = (role == expected_role)
+            
+            # Check Rule 3: Users in system admins
+            elif user in sys_admins:
+                expected_role = "SC Governance System Admin"
+                is_conforming = (role == expected_role)
+            
+            # If not in any list, might need special handling or flagging
+            else:
+                # No specific rule applies - might want to flag these separately
+                expected_role = "No role defined in baseline"
+            
+            # Add to results if non-conforming or if no rule applies
+            if not is_conforming or expected_role == "No role defined in baseline":
+                comment = ""
+                if expected_role != "No role defined in baseline":
+                    comment = f"Role should be changed to: {expected_role}"
+                else:
+                    comment = "User not found in any baseline list"
+                
+                results.append({
+                    'Timestamp': now,
+                    'Account': account_name,
+                    'User': user,
+                    'Current Role': role,
+                    'Expected Role': expected_role if expected_role else "N/A",
+                    'Is Conforming': "Yes" if is_conforming else "No",
+                    'Comments': comment
+                })
+        
+        return pd.DataFrame(results)
+
+    # Then modify your export_comparison_to_excel method to include this new sheet:
+
+
+    
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = Auditor()
+    window.show()
+    sys.exit(app.exec_())
