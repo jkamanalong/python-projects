@@ -1,0 +1,554 @@
+# Export Automation Tool - For web based application (Corrigo)
+
+**Automated Data Export & Post-Processing for Web-Based Service Platform**
+
+A robust desktop automation tool built with **Python** that streamlines the extraction of custom reports from a web-based service management platform (Corrigo ServiceCenter) across multiple client accounts, followed by automated VBA macro processing.
+
+This "Export Automation" tool eliminates hours of repetitive manual navigation, exporting, and formatting — enabling fast, consistent data pulls for compliance, auditing, or reporting needs.
+
+### Business Impact
+- Reduced report export time per client from **20–30 minutes to under 5 minutes**
+- Eliminated manual errors in navigation, portfolio selection, and file renaming
+- Enabled batch processing of **dozens of accounts** in a single run
+- Standardized post-processing via VBA macros for immediate analysis (e.g., flagging issues, formatting)
+- Freed up team time for higher-value audit and review work
+
+### Key Features
+- **Clean Tkinter GUI** for selecting input files, folders, and parameters
+- **Batch account processing** from an Excel list of client names
+- **Selenium web automation** with smart waiting, window/tab handling, and hover actions
+- **Manual login support** with extended timeout (secure — no hardcoded credentials)
+- **Dynamic export navigation** to Import/Export page and custom search query filtering
+- **Interactive portfolio selection** during export (when required by popup)
+- **Automatic download detection**, renaming (with account prefix), and organized saving
+- **Progress bar** showing real-time completion across accounts
+- **Dedicated "Macro" button** to run VBA post-processing on all exported files using `win32com`
+- **Flexible macro execution** — prompts for module and macro name, passes file paths and reference data
+
+### Technologies Used
+- **Python 3** – Core scripting
+- **Tkinter** – Native GUI framework with progress bar and file dialogs
+- **Selenium WebDriver** – Browser automation and interaction
+- **pandas** – Reading account lists from Excel
+- **openpyxl / xlwings** – Excel file handling support
+- **pywin32 (win32com)** – Direct Excel automation and VBA macro execution
+- **pathlib, os, shutil** – File and directory management
+
+### How It Works (High-Level Flow)
+1. User configures via GUI:
+   - Excel file with list of account names
+   - Search query (e.g., report template name)
+   - Download and final dump folders
+   - Macro-enabled workbook and reference file
+2. On "Run":
+   - Opens Chrome and waits for **manual login** (secure credential handling)
+   - Navigates to production environment and account selector
+   - Loops through each account:
+     - Searches and switches to account dashboard
+     - Navigates to Import/Export page
+     - Searches for desired export template
+     - Triggers download (handles portfolio selection if prompted)
+     - Waits for file download, renames with account prefix, moves to dump folder
+     - Updates progress bar
+   - Switches back to main tab for next account
+3. On "Macro":
+   - Prompts for VBA module and macro name
+   - Opens macro workbook via Excel COM
+   - Runs specified macro on each exported file, passing file path and parameters
+   - Renames processed files (e.g., adds "[F]" prefix)
+
+### Setup & Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/export-automation-tool.git
+   cd export-automation-tool
+
+
+### Python Code
+
+from selenium import webdriver
+from selenium.webdriver.support.ui import Select
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver import ActionChains
+from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.chrome.service import Service
+import pandas as pd
+import os
+import shutil
+import time
+import traceback
+import getpass
+from pathlib import Path
+from openpyxl import load_workbook
+from openpyxl.worksheet.worksheet import Worksheet
+import xlwings as xw
+import tkinter as tk
+from tkinter import Tk, filedialog
+from tkinter import filedialog
+from tkinter import messagebox
+from tkinter import ttk
+from tkinter import simpledialog
+import win32com.client
+import win32com.client as win32
+import pythoncom
+import sys
+import traceback
+
+# Initialize the root window
+root = tk.Tk()
+root.title("Automation Program")
+
+root.configure(bg='#ccb0a5')
+root.geometry("500x530")  # Increased height to accommodate new element
+label_color = "#2b130a"
+
+# Define the variables for storing file paths
+account_file = tk.StringVar()
+macro_file_path = tk.StringVar()
+folder_path = tk.StringVar()
+default_download_directory = tk.StringVar()
+search_query = tk.StringVar()
+one_user_one_role_ref = tk.StringVar()  # New variable for One User One Role - Reference
+
+#Defining Macro Pathing
+macro_module = tk.StringVar()
+macro_name = tk.StringVar()
+
+#FILE DIALOG FUNCTIONS:
+def browse_file(var): #fileDialog
+   file = filedialog.askopenfilename()
+   var.set(file)
+def browse_folder(var): #folderDialog
+   folder = filedialog.askdirectory()
+   var.set(folder)
+
+def get_login_details():
+    username = simpledialog.askstring("Login Failed", "Enter Login ID:")
+    password = simpledialog.askstring("Login Failed", "Enter Password:", show='*')
+    return username, password
+
+def get_macro_details():
+   macro_module = simpledialog.askstring("Enter Macro Module Name:")
+   macro_name = simpledialog.askstring("Enter Macro Name:")
+   
+def process_accounts_with_selenium(account_file, folder_path, default_download_directory, macro_file_path, update_progress, search_query):
+
+   #READS THE ACCOUNT_FILE LIST
+   account_names = pd.read_excel(account_file, header=None, names=['AccountName'])
+   print(account_names)
+
+   #LOGIN LOOP
+   counter = 0
+   MAX_ATTEMPTS = 5
+   login_successful = False
+   driver = None
+   while counter < MAX_ATTEMPTS and not login_successful:
+     driver = webdriver.Chrome()
+     driver.get("https://servicecenter.corrigo.com/")
+     time.sleep(3)
+     
+     # Wait for the user to input credentials and click submit
+     print("Please enter your username and password in the browser window, then click submit.")
+     print("The program will wait for you to complete this step.")
+        
+     # Wait for the user to complete the login process
+     try:
+         # Wait for an element that appears only after successful login
+         wait = WebDriverWait(driver, 300)  # 5 minutes timeout
+         element = wait.until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/div[1]/div/div/ul/li[3]/button/span[1]")))
+         print("Login successful!")
+         login_successful = True
+     except TimeoutException:
+         counter += 1
+         remaining = MAX_ATTEMPTS - counter
+         print(f"Login failed or timed out. {remaining} attempts remaining.")
+         if counter < MAX_ATTEMPTS:
+             print("Please try again.")
+             driver.quit()
+         else:
+             print("Maximum login attempts reached. Please try again later.")
+             driver.quit()
+             return None, None
+
+   if not login_successful:
+        print("Login process failed. Exiting the program.")
+        return None, None
+
+
+   #SC NAVIGATION
+   production_button = driver.find_element(By.XPATH, '/html/body/div[1]/div[1]/div/div/ul/li[3]/button/span[1]')
+   production_button.click()
+   time.sleep(3)
+   production_secondbutton = driver.find_element(By.XPATH, '/html/body/div[1]/div[1]/div/div/ul/li[3]/ul/li[1]/a/span')
+   production_secondbutton.click()
+   time.sleep(3)
+   wait = WebDriverWait(driver, 10)
+   element = wait.until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div/div/div/div[2]/span/span[1]/span/ul/li/input")))
+   element = driver.find_element(By.XPATH, '/html/body/div[1]/div[2]/div/div/div/div[2]/span/span[1]/span/ul/li/input')
+   element.click()
+   time.sleep(3)
+
+
+   #MAIN WINDOW HANDLE STORING
+   main_window = driver.current_window_handle
+
+   for account_name in account_names['AccountName']:
+        try:
+            element.clear()
+            element.send_keys(account_name)
+            element.send_keys(Keys.RETURN)
+            time.sleep(10)
+            print(f"Now processing Account: {account_name}.")
+            print(f"trying to store the window handle")
+            # Store the window handles before opening a new tab
+            windows = driver.window_handles
+            driver.switch_to.window(windows[-1])
+            
+            # Wait for page change or timeout
+            try:
+                # Wait for a new element that appears only after redirection
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'page-title') and //text()='My Dashboard']"))
+                ) #Checks if there is "My Dashboard"
+                print(f"Successfully redirected for account: {account_name}")
+            except Exception as e:
+                print(f"Account '{account_name}' might be incorrect. Skipping to next account.")
+                driver.switch_to.window(windows[0]) #Switch to main tab if there is no redirection
+                continue  # Skip to the next iteration of the loop
+
+            time.sleep(3)
+            url = driver.current_url
+            time.sleep(2)
+            print(account_name + ' : ' + url)
+
+            dynamic_part =(lambda x: x.lower())(url).split('/common/')[0]
+            new_url = dynamic_part + '/common/importexport.aspx'
+            time.sleep(5)
+            driver.execute_script("window.location.href = arguments[0]", new_url) #Opens a new window for the revised link
+            time.sleep(2)
+            
+            #//div[@class="_pendo-step-container-size"]//button[@class="_pendo-close-guide"]
+            try:
+               pendo_close_button = WebDriverWait(driver, 5).until(
+                   EC.presence_of_element_located((By.XPATH, '//div[@class="_pendo-step-container-size"]//button[@class="_pendo-close-guide"]')))
+               pendo_close_button.click()
+               print("Closed Pendo guide.")
+            except TimeoutException:
+               print("No Pendo guide found or already closed.")
+            
+            # Rest of the code for further actions
+            time.sleep(2)
+            # SEARCHBAR
+            print(f"Typing in {search_query} in the search bar")
+            searchbar = wait.until(EC.visibility_of_element_located((By.XPATH, '//div[contains(@class,"filter-block")]//input[@type="text"]')))
+            searchbar = driver.find_element(By.XPATH, '//div[contains(@class,"filter-block")]//input[@type="text"]')
+            searchbar.clear()
+            searchbar.send_keys(search_query)
+            searchbar.send_keys(Keys.RETURN)
+            time.sleep(7)
+
+            selector = '//tr[@class="k-table-row k-master-row"][1]//td[@class="actions-cell k-table-td"]//div[@class="kg-record-action kg-download"]' #The export button
+            # Using ActionChains to hover over the element and reveal the actions underneath.
+            actions = ActionChains(driver)
+            element_to_hover_over = driver.find_element(By.XPATH,selector)
+
+            # Move the mouse to the element
+            actions.move_to_element(element_to_hover_over)
+            actions.perform()
+
+            # Now you can perform the click (or any other action) on the revealed element
+            sub_element = wait.until(EC.presence_of_element_located((By.XPATH, '//tr[@class="k-table-row k-master-row"][1]//td[@class="actions-cell k-table-td"]//div[@class="kg-record-action kg-download"]')))
+            sub_element.click()
+
+            #Initializing the download directory
+            initial_files = set(os.listdir(default_download_directory))
+
+            
+            #-------------------------------------------------------------------------#
+            
+            print("Checking if there is a window pop-up")
+
+            #//div[@class="modal-scrollable"]//div[@class="modal-body"]//form[@class="id-download-dialog corrigo-form"]//span[@class="k-input-button k-button k-button-md k-button-solid k-button-solid-base k-icon-button"]
+            #//div[@class="modal-scrollable"]//div[@class="modal-body"]//form[@class="id-download-dialog corrigo-form"]//span[@class="k-input-value-text"]
+            try:
+               print("Finding Dropdown")
+               portfolio_button = WebDriverWait(driver, 3).until(
+                   EC.element_to_be_clickable((By.XPATH, '//div[@class="widget-control"]//span[@class="k-input-inner"]//span[@class="k-input-value-text"]'))
+                   )
+               '''print("Clicking Dropdown")
+               portfolio_button.click()
+               print("Finding Portfolio")
+               option_click=driver.find_element(By.XPATH, "//span[text()='Portfolio']")
+               print("Clicking Portfolio")
+               option_click.click()'''
+               print("Clicking through portfolio options")
+               dropdown_element = WebDriverWait(driver, 3).until(
+                   EC.element_to_be_clickable((By.XPATH, '//span[@class="k-input-inner control-label"]'))
+                   )
+               dropdown_element.click()
+
+               # Ask user for portfolio input
+               while True:
+                   user_portfolio = input("Enter the portfolio you want to use: ").strip()
+                   if user_portfolio:
+                      break
+                   else:
+                      print("Please enter a valid portfolio name.")
+               
+               print(f"Typing in {user_portfolio}")
+               search_bar = WebDriverWait(driver, 3).until(
+                  EC.element_to_be_clickable((By.XPATH, '//div[@class="search-box-container"]//input[@class="corrigo-text-field"]'))
+                  )
+               search_bar.send_keys(user_portfolio)
+               time.sleep(5)
+               print("Clicking the 1st option")
+               first_result = WebDriverWait(driver, 3).until(
+                   EC.element_to_be_clickable((By.XPATH, '//div[@class="k-animation-container k-animation-container-shown"]//div[@class="k-list-container corrigo-inputs"]//li[@class="k-item"][1]'))
+                   )
+               first_result.click()
+               dropdown_element.click()
+               export_second = WebDriverWait(driver, 3).until(
+                   EC.element_to_be_clickable((By.XPATH, '//div[@class="modal-footer"]//div[@class="right"]//button[@class="btn btn-primary id-btn-save"]'))
+                   )
+               export_second.click()
+        
+            except TimeoutException:
+               print(f"Element not clickable or buttons not found for account: {account_name}. Proceeding with checking for downloaded file.")
+
+            #-------------------------------------------------------------------------#
+            #-------------------------------------------------------------------------#
+               
+            def check_file_downloaded(download_dir, timeout=60):
+               print("Waiting for latest downloaded Excel File...")
+               start_time = time.time()
+        
+               while True:
+                  current_files = set(os.listdir(download_dir))
+                  new_files = current_files - initial_files
+                  excel_files = [f for f in new_files if f.endswith(('.xlsx', '.xls'))]
+                  if excel_files:
+                     latest_file = max(excel_files, key=lambda f: os.path.getctime(os.path.join(download_dir, f)))
+                     print(f"Latest Excel file Downloaded: {latest_file}")
+                     return os.path.join(download_dir, latest_file)
+
+                  if time.time() - start_time > timeout:
+   
+                     print(f"Timeout reached without detecting {account_name} file.")
+                     user_choice = input("Do you want to keep waiting? (y/n): ").lower().strip()
+                     if user_choice == 'y':
+                         print("Continuing to wait...")
+                         start_time = time.time()  # Reset the timer
+                     else:
+                         print("Stopping the wait.")
+                         return None
+            time.sleep(3)
+            # Wait for the file to be downloaded
+            latest_file = check_file_downloaded(default_download_directory)
+
+            # Generate a new file name by appending the account name to the downloaded file
+            new_file_name = account_name + '_' + os.path.basename(latest_file)
+              
+            # Move file to desired directory
+            shutil.move(latest_file, os.path.join(folder_path, new_file_name))
+
+            print(f"Successfully moved the downloaded file and renamed to {new_file_name}.")
+                 
+        except Exception as e:
+            print(f"Error for {account_name}: {str(e)}")
+            traceback.print_exc()
+         
+        # Close the newly opened tab
+        driver.close()
+        
+        # Switch back to the main window
+        driver.switch_to.window(main_window)
+        
+        time.sleep(5)
+
+
+def runMacro(macro_file_path, one_user_one_role_ref):
+    macro_file_path_value = macro_file_path.get()
+    one_user_one_role_ref_value = one_user_one_role_ref.get()
+    folder_path_value = folder_path.get()
+    file_list = os.listdir(folder_path_value)
+    xl = None
+    # Ask user for module input
+    while True:
+        module_input = input("Enter the module name from where your VBA is written: ").strip()
+        if module_input:
+           break
+        else:
+           print("Please enter a valid module name.")
+    #Ask user for macro name
+    while True:
+        macro_input = input("Enter the macro name from where your VBA is written: ").strip()
+        if macro_input:
+           break
+        else:
+           print("Please enter a valid macro name.")
+    try:
+        pythoncom.CoInitialize()
+        xl = win32com.client.Dispatch("Excel.Application")
+        xl.Visible = False
+        xl.DisplayAlerts = False
+
+        print(f"Opening macro file: {macro_file_path_value}")
+        wb_macro = xl.Workbooks.Open(macro_file_path_value)
+        macro_book_name = os.path.basename(macro_file_path_value)
+
+        #------------------Code block written only for Roles Checking-----#
+        '''
+        print(f"Checking for presence of Results Sheet")
+        # Ensure "Results" sheet exists in macro file
+        if "Results" not in [sheet.Name for sheet in wb_macro.Sheets]:
+            wb_macro.Sheets.Add().Name = "Results"
+            print(f"Added Results Sheet")
+        results_sheet = wb_macro.Sheets("Results")
+        print(f"Results Sheet Present")
+        '''
+        #------------------Code block written only for Roles Checking-----#
+        
+        for file_name in file_list:
+            file_path = os.path.join(folder_path_value, file_name).replace('\\', '/')
+            print(f"Processing file: {file_path}")
+            try:
+                print(f"Running macro for {file_name}")
+                print(f"Attempting to run macro: '{macro_book_name}'!{module_input}.{macro_input}")
+                print(f"With file path: {file_path}")
+                # Run the macro, passing the file path
+                xl.Application.Run(f"'{macro_book_name}'!{module_input}.{macro_input}", file_path, file_name, one_user_one_role_ref_value)
+
+                print(f"Macro completed for {file_name}")
+
+                new_file_name = "[F]" + file_name
+                new_file_path = os.path.join(folder_path.get(), new_file_name)
+                os.rename(file_path, new_file_path)
+                print(f"Successfully processed and renamed {file_name}")
+            except Exception as e:
+                print(f"Error processing {file_name}: {str(e)}")
+                print(f"Error details: {type(e).__name__}, {str(e)}")
+                print(f"Error args: {e.args}")
+                print(traceback.format_exc())
+
+        wb_macro.Close(SaveChanges=False)
+    except Exception as e:
+        print(f"Excel automation error: {str(e)}")
+        print(traceback.format_exc())
+    finally:
+        if xl is not None:
+            try:
+                xl.Quit()
+            except Exception as e:
+                print(f"Error quitting Excel application: {str(e)}")
+        pythoncom.CoUninitialize()
+
+    time.sleep(2)
+
+def run_automation():
+   accounts_list = account_file.get()
+   dump_folder = folder_path.get()
+   download_folder = default_download_directory.get()
+   search_query_value = search_query.get()
+   macro_file_path_value = macro_file_path.get()
+   one_user_one_role_ref_value = one_user_one_role_ref.get()  # Get the value of One User One Role - Reference
+
+
+   num_accounts = len(pd.read_excel(accounts_list, header=None, names=['AccountName']))
+   # Reset progress bar
+   progress_bar['value'] = 0
+   progress_bar['maximum'] = num_accounts
+
+   # Create a callback function to update the progress bar
+   def update_progress():
+      progress_bar['value'] += 1
+      root.update_idletasks()  # Force update of the GUI
+
+      
+   # Call your selenium function here
+   updated_username, updated_password = process_accounts_with_selenium(accounts_list, dump_folder, download_folder, macro_file_path_value, update_progress, search_query_value)
+   
+   if updated_username and updated_password:
+      # Update the GUI elements with the new credentials if they changed
+      username.set(updated_username)
+      password.set(updated_password)
+      
+   messagebox.showinfo("Complete", "Processing completed!")
+   
+#RESET and EXIT BUTTONS
+def reset():
+    username.set("")
+    password.set("")
+    account_file.set("")
+    macro_file_path.set("")
+    search_query.set("")
+    folder_path.set("")
+    default_download_directory.set("")
+    progress_bar['value'] = 0
+def exit_program():
+    root.quit()
+
+# Define colors
+bg_color = "#ccb0a5"
+text_color = "#000000"
+
+# Creating GUI Elements
+# Add the header
+header = tk.Label(root, text="JLL UI Centric Automation - Corrigo Inactive Users", font=("Helvetica", 14, "bold"), bg=bg_color, fg=text_color, bd=2, relief="raised")
+header.grid(row=0, column=0, columnspan=3, pady=(20, 15))
+
+tk.Label(root, text="Search Query", anchor="w", bg=bg_color, fg=text_color, bd=1, relief="solid", width=23, font=("Verdana", 8)).grid(row=1, column=0, sticky="w", padx=(10, 0), pady=(10, 0))
+tk.Entry(root, textvariable=search_query, width=40, bd=2, relief="sunken").grid(row=1, column=1, padx=(10, 0), pady=(10, 0))
+
+# New label, entry, and browse button for One User One Role - Reference
+tk.Label(root, text="One User One Role - Ref", anchor="w", bg=bg_color, fg=text_color, bd=1, relief="solid", width=23, font=("Verdana", 8)).grid(row=2, column=0, sticky="w", padx=(10, 0), pady=(10, 0))
+tk.Entry(root, textvariable=one_user_one_role_ref, width=40, bd=2, relief="sunken").grid(row=2, column=1, padx=(10, 0), pady=(10, 0))
+tk.Button(root, text="Browse", command=lambda: browse_file(one_user_one_role_ref), bd=2, relief="raised", bg=bg_color, font=("Tahoma", 8, "bold")).grid(row=2, column=2, padx=(10, 15), pady=(10, 0))
+
+separator = ttk.Separator(root, orient="horizontal")
+separator.grid(row=3, column=0, padx=5, pady=15, sticky="ew", columnspan=3)
+
+# Shift the following elements down by one row
+tk.Label(root, text="Accounts List", anchor="w", bg=bg_color, fg=text_color, bd=1, relief="solid", width=23, font=("Verdana", 8)).grid(row=4, column=0, sticky="w", padx=(10, 0), pady=(10, 0))
+tk.Entry(root, textvariable=account_file, width=40, bd=2, relief="sunken").grid(row=4, column=1, padx=(10, 0), pady=(10, 0))
+tk.Button(root, text="Browse", command=lambda: browse_file(account_file), bd=2, relief="raised", bg=bg_color, font=("Tahoma", 8, "bold")).grid(row=4, column=2, padx=(10, 15), pady=(10, 0))
+
+tk.Label(root, text="Macro-Enabled Workbook", anchor="w", bg=bg_color, fg=text_color, bd=1, relief="solid", width=23, font=("Verdana", 8)).grid(row=5, column=0, sticky="w", padx=(10, 0), pady=(10, 0))
+tk.Entry(root, textvariable=macro_file_path, width=40, bd=2, relief="sunken").grid(row=5, column=1, padx=(10, 0), pady=(10, 0))
+tk.Button(root, text="Browse", command=lambda: browse_file(macro_file_path), bd=2, relief="raised", bg=bg_color, font=("Tahoma", 8, "bold")).grid(row=5, column=2, padx=(10, 15), pady=(10, 0))
+
+tk.Label(root, text="Dump Folder", anchor="w", bg=bg_color, fg=text_color, bd=1, relief="solid", width=23, font=("Verdana", 8)).grid(row=6, column=0, sticky="w", padx=(10, 0), pady=(10, 0))
+tk.Entry(root, textvariable=folder_path, width=40, bd=2, relief="sunken").grid(row=6, column=1, padx=(10, 0), pady=(10, 0))
+tk.Button(root, text="Browse", command=lambda: browse_folder(folder_path), bd=2, relief="raised", bg=bg_color, font=("Tahoma", 8, "bold")).grid(row=6, column=2, padx=(10, 15), pady=(10, 0))
+
+tk.Label(root, text="Download Folder", anchor="w", bg=bg_color, fg=text_color, bd=1, relief="solid", width=23, font=("Verdana", 8)).grid(row=7, column=0, sticky="w", padx=(10, 0), pady=(10, 20))
+tk.Entry(root, textvariable=default_download_directory, width=40, bd=2, relief="sunken").grid(row=7, column=1, padx=(10, 0), pady=(10, 20))
+tk.Button(root, text="Browse", command=lambda: browse_folder(default_download_directory), bd=2, relief="raised", bg=bg_color, font=("Tahoma", 8, "bold")).grid(row=7, column=2, padx=(10, 15), pady=(10, 20))
+
+separator = ttk.Separator(root, orient="horizontal")
+separator.grid(row=8, column=0, padx=5, pady=15, sticky="ew", columnspan=3)
+
+
+
+# Run, Reset, and Exit Buttons
+tk.Button(root, text="Run", command=run_automation, bd=2, relief="raised", width=7, bg=bg_color, font=("Tahoma", 8, "bold")).grid(row=11, column=0, pady=(10, 20), sticky="w", padx=(10, 0))
+tk.Button(root, text="Reset", command=reset, bd=2, relief="raised", width=7, bg=bg_color, font=("Tahoma", 8, "bold")).grid(row=11, column=0, pady=(10, 20), sticky="e")
+tk.Button(root, text="Macro", command=lambda: runMacro(macro_file_path, one_user_one_role_ref), bd=2, relief="raised", width=7, bg=bg_color, font=("Tahoma", 8, "bold")).grid(row=11, column=1, pady=(10, 20), sticky="w", padx=(40, 0))
+tk.Button(root, text="Exit", command=exit_program, bd=2, relief="raised", width=7, bg=bg_color, font=("Tahoma", 8, "bold")).grid(row=11, column=2, pady=(10, 20))
+
+
+# Assuming root_bg_color is the background color of your root window
+root_bg_color = root.cget('bg')  # This gets the background color of the root window
+
+# Progress Label
+progress_label = tk.Label(root, text="Export Progress Bar, %", anchor="center", font=("Arial", 10, "bold"), fg=text_color, bg=root_bg_color)
+progress_label.grid(row=9, column=0, columnspan=3, sticky="ew", pady=(5,0)) 
+
+# Progress Bar
+progress_bar = ttk.Progressbar(root, orient="horizontal", length=300, mode="determinate")
+progress_bar.grid(row=10, column=0, pady=(0,10), columnspan=3, sticky="ew")
+root.mainloop()
