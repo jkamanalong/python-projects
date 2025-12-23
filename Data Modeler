@@ -72,3 +72,161 @@ This tool demonstrates:
 - Clean GUI design with real-time data interaction
 - Smart use of pandas for transformation logic
 - Solving a common pain point in BI/analytics workflows
+
+
+### Python Code
+
+
+import sys
+import pandas as pd
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+                             QPushButton, QComboBox, QTableWidget, QTableWidgetItem, 
+                             QCheckBox, QFileDialog, QLineEdit, QLabel, QMessageBox)
+from PyQt5.QtCore import Qt
+class DataModelerApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Data Modeler")
+        self.setGeometry(100, 100, 1200, 600)
+        # Data storage
+        self.df = None
+        self.dimension_tables = []
+        self.current_sheet = None
+        self.file_path = None
+        # UI components
+        self.main_widget = QWidget()
+        self.setCentralWidget(self.main_widget)
+        self.layout = QVBoxLayout(self.main_widget)
+        # File selection
+        self.browse_btn = QPushButton("Browse Fact Table")
+        self.browse_btn.clicked.connect(self.browse_file)
+        self.layout.addWidget(self.browse_btn)
+        # Sheet selector
+        self.sheet_selector = QComboBox()
+        self.sheet_selector.currentTextChanged.connect(self.load_sheet)
+        self.layout.addWidget(QLabel("Select Sheet:"))
+        self.layout.addWidget(self.sheet_selector)
+        # Column analysis table
+        self.column_table = QTableWidget()
+        self.column_table.setColumnCount(5)
+        self.column_table.setHorizontalHeaderLabels(["Attribute", "Primary Key", "Column Name", "Data Type", "Profile"])
+        self.layout.addWidget(self.column_table)
+        # Dimension table creation
+        dim_layout = QHBoxLayout()
+        self.dim_name_input = QLineEdit()
+        self.dim_name_input.setPlaceholderText("Dimension Table Name")
+        self.create_dim_btn = QPushButton("Create Dimension Table")
+        self.create_dim_btn.clicked.connect(self.create_dimension_table)
+        dim_layout.addWidget(self.dim_name_input)
+        dim_layout.addWidget(self.create_dim_btn)
+        self.layout.addLayout(dim_layout)
+        # Dimension tables list
+        self.dim_list = QComboBox()
+        self.dim_list.currentTextChanged.connect(self.display_dimension_table)
+        self.layout.addWidget(QLabel("Created Dimension Tables:"))
+        self.layout.addWidget(self.dim_list)
+        # Save button
+        self.save_btn = QPushButton("Save File")
+        self.save_btn.clicked.connect(self.save_file)
+        self.layout.addWidget(self.save_btn)
+    def browse_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Fact Table", "", "Excel/CSV Files (*.xlsx *.xls *.csv)")
+        if file_path:
+            self.file_path = file_path
+            self.sheet_selector.clear()
+            if file_path.endswith('.csv'):
+                self.df = pd.read_csv(file_path)
+                self.sheet_selector.addItem("Sheet1")
+                self.current_sheet = "Sheet1"
+                self.analyze_columns()
+            else:
+                xl = pd.ExcelFile(file_path)
+                self.sheet_selector.addItems(xl.sheet_names)
+                if xl.sheet_names:
+                    self.current_sheet = xl.sheet_names[0]
+                    self.df = pd.read_excel(file_path, sheet_name=self.current_sheet)
+                    self.analyze_columns()
+    def load_sheet(self, sheet_name):
+        if sheet_name and self.file_path:
+            self.current_sheet = sheet_name
+            if not self.file_path.endswith('.csv'):
+                self.df = pd.read_excel(self.file_path, sheet_name=sheet_name)
+            self.analyze_columns()
+    def analyze_columns(self):
+        if self.df is None:
+            return
+        self.column_table.setRowCount(len(self.df.columns))
+        for i, col in enumerate(self.df.columns):
+            # Checkboxes
+            attr_cb = QCheckBox()
+            pk_cb = QCheckBox()
+            self.column_table.setCellWidget(i, 0, attr_cb)
+            self.column_table.setCellWidget(i, 1, pk_cb)
+            # Column name
+            self.column_table.setItem(i, 2, QTableWidgetItem(col))
+            # Data type
+            dtype = str(self.df[col].dtype)
+            self.column_table.setItem(i, 3, QTableWidgetItem(dtype))
+            # Profile
+            nulls = self.df[col].isna().sum()
+            empty = self.df[col].eq('').sum() if self.df[col].dtype == 'object' else 0
+            distinct = self.df[col].nunique()
+            total = len(self.df[col])
+            profile = f"Nulls: {nulls}, Empty: {empty}, Distinct: {distinct}, Total: {total}"
+            self.column_table.setItem(i, 4, QTableWidgetItem(profile))
+        self.column_table.resizeColumnsToContents()
+    def create_dimension_table(self):
+        if self.df is None:
+            QMessageBox.warning(self, "Error", "No fact table loaded.")
+            return
+        dim_name = self.dim_name_input.text().strip()
+        if not dim_name:
+            QMessageBox.warning(self, "Error", "Please enter a dimension table name.")
+            return
+        selected_attrs = []
+        selected_pks = []
+        for i in range(self.column_table.rowCount()):
+            attr_cb = self.column_table.cellWidget(i, 0)
+            pk_cb = self.column_table.cellWidget(i, 1)
+            col_name = self.column_table.item(i, 2).text()
+            if attr_cb.isChecked():
+                selected_attrs.append(col_name)
+            if pk_cb.isChecked():
+                selected_pks.append(col_name)
+        if not selected_attrs:
+            QMessageBox.warning(self, "Error", "No attributes selected for dimension table.")
+            return
+        # Create dimension table
+        dim_df = self.df[selected_attrs + [col for col in selected_pks if col not in selected_attrs]].drop_duplicates()
+        self.dimension_tables.append((dim_name, dim_df))
+        # Update fact table (keep primary keys, remove selected attributes except primary keys)
+        cols_to_remove = [col for col in selected_attrs if col not in selected_pks]
+        self.df = self.df.drop(columns=cols_to_remove, errors='ignore')
+        # Update UI
+        self.dim_list.addItem(dim_name)
+        self.analyze_columns()
+        self.dim_name_input.clear()
+        QMessageBox.information(self, "Success", f"Dimension table '{dim_name}' created.")
+    def display_dimension_table(self, dim_name):
+        if dim_name:
+            for name, df in self.dimension_tables:
+                if name == dim_name:
+                    # Optionally, display the dimension table in a new table widget or dialog
+                    print(f"Displaying {dim_name}:\n{df.head().to_string()}")  # Placeholder for display
+    def save_file(self):
+        if self.df is None:
+            QMessageBox.warning(self, "Error", "No fact table loaded.")
+            return
+        save_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Excel Files (*.xlsx)")
+        if save_path:
+            with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
+                self.df.to_excel(writer, sheet_name="Fact Table", index=False)
+                for dim_name, dim_df in self.dimension_tables:
+                    dim_df.to_excel(writer, sheet_name=dim_name, index=False)
+            QMessageBox.information(self, "Success", "File saved successfully.")
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = DataModelerApp()
+    window.show()
+    sys.exit(app.exec_())
+
