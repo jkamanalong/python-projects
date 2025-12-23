@@ -1,0 +1,74 @@
+Semi-Automated Dimensional Modeling Tool for Data Warehousing
+
+A lightweight desktop application built with Python and PyQt5 that helps transform flat fact tables (Excel/CSV) into a proper star schema data model — creating normalized dimension tables and a clean fact table in one intuitive workflow.
+Perfect for data analysts, BI developers, and anyone preparing data for Power BI, Tableau, or data warehouses without needing expensive ETL tools.
+
+### Business Impact
+
+Reduced time to build star schema models from hours to minutes
+Eliminated manual copy-paste errors when denormalizing data
+Enabled non-technical analysts to create clean, query-optimized data models
+Produced ready-to-load Excel files with proper fact and dimension tables
+Improved report performance and consistency in downstream BI tools
+
+### Key Features
+
+Intuitive PyQt5 GUI with real-time column profiling
+Load Excel (multi-sheet) or CSV as the initial fact table
+Column analysis table showing:
+Data type
+Null/empty counts
+Distinct values
+Total rows
+
+Checkboxes to mark columns as:
+Attributes (to move to dimension)
+Primary Key (surrogate or business key)
+
+Create multiple dimension tables by selecting attributes
+Automatically deduplicates rows
+Removes selected attributes from fact table (except PKs)
+
+View list of created dimensions
+One-click save to multi-sheet Excel with:
+Clean fact table
+Separate sheets for each dimension
+
+
+### Technologies Used
+
+Python 3 – Core language
+PyQt5 – Responsive desktop interface
+pandas – Data loading, manipulation, and export
+openpyxl – Reliable Excel writing with multiple sheets
+
+### How It Works
+
+Load your raw/flat data file (fact table source)
+Select sheet (if Excel)
+Review column profiles and check:
+Attributes you want in a dimension
+Primary key columns (stay in fact table for joins)
+
+Enter dimension name → "Create Dimension Table"
+Tool extracts unique combinations and creates dim table
+Removes redundant attributes from fact table
+
+Repeat for multiple dimensions (e.g., Date, Customer, Product, Location)
+Save → get a properly structured star schema Excel file
+
+
+### Setup and installation: 
+git clone https://github.com/yourusername/data-modeler-star-schema.git
+cd data-modeler-star-schema
+pip install pyqt5 pandas openpyxl
+python main.py
+
+### Why This Project Matters for My Portfolio
+This tool demonstrates:
+
+- Practical data warehousing and dimensional modeling knowledge
+- Building user-friendly tools that bridge technical and business needs
+- Clean GUI design with real-time data interaction
+- Smart use of pandas for transformation logic
+- Solving a common pain point in BI/analytics workflows
