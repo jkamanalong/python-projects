@@ -31,10 +31,435 @@ It significantly reduces audit time from hours to minutes per client.
 - Pandas – Data processing
 - XML parsing for configuration
 
-### Screenshot
-
-
 ### How to Run (Demo Instructions)
 1. Install dependencies:
    ```bash
    pip install -r requirements.txt
+
+### Python Code
+
+import sys
+import json
+import xlwings as xw
+from selenium.webdriver.common.by import By
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import WebDriverException
+import getpass
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QFileDialog, QVBoxLayout, QHBoxLayout, QComboBox, QMessageBox
+from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QSize
+from PyQt5 import QtCore
+import xml.etree.ElementTree as ET
+import os
+import shutil
+import pandas as pd
+import time
+
+class FileAndFolderSelector(QWidget): 
+    def __init__(self):
+        super().__init__()
+        self.init_ui() 
+
+    def init_ui(self):
+        self.setStyleSheet('background-color: #dee2e6;') 
+        self.file_path_input = QLineEdit() 
+        self.file_path_input.setStyleSheet('background-color: white')
+        self.file_browse_button = QPushButton('Browse File') 
+        self.file_browse_button.setStyleSheet('background-color: #c1121f; color: white;')
+        self.file_browse_button.clicked.connect(self.get_file_pathExcel) 
+        self.file_path_inputPDF = QLineEdit()
+        self.file_path_inputPDF.setStyleSheet('background-color: white')
+        self.file_browse_buttonPDF = QPushButton('Browse File')
+        self.file_browse_buttonPDF.setStyleSheet('background-color: #c1121f; color: white;')
+        self.file_browse_buttonPDF.clicked.connect(self.get_file_pathMacro)
+        self.folder_path_input = QLineEdit()
+        self.folder_path_input.setStyleSheet('background-color: white')
+        self.folder_browse_button = QPushButton('Browse Folder')
+        self.folder_browse_button.setStyleSheet('background-color: #c1121f; color: white;')
+        self.folder_browse_button.clicked.connect(self.get_folder_path)
+        self.run_button = QPushButton('Run')
+        self.run_button.clicked.connect(self.print_values)
+        self.run_button.setStyleSheet('background-color: #c1121f; color: white;')
+        layout = QVBoxLayout(self) 
+        self.title_label = QLabel('Corrigo Audit Automation Tool')
+        self.title_label.setStyleSheet('background-color: white')
+        self.title_label.setStyleSheet('font-size: 40px;')
+        self.title_label.setAlignment(Qt.AlignHCenter)
+        
+        layout.addWidget(self.title_label)
+        layout.addWidget(QLabel('<span style=\'font-size: 12pt;\'>In Scope File:</span>'))
+        layout.addWidget(self.file_path_input)
+        layout.addWidget(self.file_browse_button)
+        layout.addWidget(QLabel('<span style=\'font-size: 12pt;\'>Macro Excel File:</span>'))
+        layout.addWidget(self.file_path_inputPDF)
+        layout.addWidget(self.file_browse_buttonPDF)
+        layout.addWidget(QLabel('<span style=\'font-size: 12pt;\'>Flagged File Folder location:</span>'))
+        layout.addWidget(self.folder_path_input)
+        self.folder_browse_button = QPushButton('Browse File')
+        self.folder_browse_button.setStyleSheet('background-color: #c1121f; color: white;')
+        self.folder_browse_button.clicked.connect(self.get_folder_path)
+        layout.addWidget(self.folder_browse_button)
+        layout.addWidget(self.run_button)
+        self.setWindowTitle('Corrigo Audit Automation Tool') 
+        self.setFixedSize(800, 700) 
+        self.setLayout(layout)
+
+    def get_file_pathExcel(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, 'Select Excel File', '', 'All Files (*);;Text Files (*.txt)')
+        
+        if file_path:
+            if '.xl' in file_path:
+                self.file_path_input.setText(file_path)
+            else:
+                QMessageBox.information(self, 'Information', 'Select Excel File')
+
+    def get_folder_path(self):
+        folder_path = QFileDialog.getExistingDirectory(self, 'Select Folder')
+        if folder_path:
+            self.folder_path_input.setText(folder_path)
+
+    def get_file_pathMacro(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, 'Select PDF File', '', 'All Files (*);;Text Files (*.txt)')
+        if '.xlsm' in file_path:
+            self.file_path_inputPDF.setText(file_path)
+        else:
+            QMessageBox.information(self, 'Information', 'Select Macro File')
+
+    def reading_config_file(self, Configfilefodler_folder, dict_config):
+        tree = ET.parse(Configfilefodler_folder)
+        
+        print('Way 2\n\n')
+        root = tree.getroot()
+        
+        run_st = ''
+        overall_environment = root.find('./prod_use')
+        for node2 in overall_environment.iter():
+            run_st = node2.text
+        if run_st == 'No':
+            qa_environment = root.find('./environment[@name=\'QA\']')
+            
+        else:
+            if run_st == 'Yes':
+                qa_environment = root.find('./environment[@name=\'dev\']')
+        qa_nodes = {}
+        for node in qa_environment.iter():
+            qa_nodes[node.tag] = node.text
+        return (qa_nodes, run_st)
+
+    def create_directory(self, directory_path):
+        if not os.path.exists(directory_path):
+            os.makedirs(directory_path)
+
+    def print_values(self):
+        user = getpass.getuser() 
+        fldpath = os.path.dirname(os.path.abspath(__file__)) 
+        Configfilefodler_folder = os.path.join(fldpath, 'config')
+        config_file = os.path.join(Configfilefodler_folder, 'Corrigo.xml')
+        dict_config = {}
+        res_dict_config, run_st = self.reading_config_file(config_file, dict_config) 
+        file = self.file_path_input.text()
+        macrofile_path = self.file_path_inputPDF.text()
+        flagged_path = self.folder_path_input.text()
+        if file == '' or macrofile_path == '' or flagged_path == '':
+            QMessageBox.information(self, 'Information', 'Please select all fields')
+            return
+        Excelfilename = os.path.basename(file)
+        PDFfilename = os.path.basename(macrofile_path)
+        file_name = os.path.basename(macrofile_path)
+        new_file_name1 = 'Output1_' + file_name
+        new_file_name = 'Output2_' + file_name
+        new_file_name3 = 'Status.xlsx'
+        ignore_filename = 'InvoiceTo'
+        ignore_filename = 'InvoiceToIgnore.xlsx'
+        macro_filename = 'Cleaning Tool.xlsm'
+        output_path = os.path.join(os.path.dirname(macrofile_path), 'Output')
+        ignorefile_path = os.path.join(os.getcwd(), 'Ignorelist')
+        ignore_file = os.path.join(ignorefile_path, ignore_filename)
+        account_list, df = self.account_list_prep(macrofile_path)
+        if len(account_list) > 0:
+            wb = xw.Book(macrofile_path, update_links=False) 
+            sheet = wb.sheets['Input']
+            sheet_tool = wb.sheets['Tool']
+            download_folder = os.path.join(fldpath, 'Downloaded Reports')
+            self.login_Corrigo(res_dict_config, fldpath, download_folder)
+            #Logs into the Corrigo system.
+            if user.lower() == 'kenneth.manalong': #Testing purposes
+                username = 'kenneth.manalong@jll.com'
+                password = 'Stage@123'
+                submit_xpath = '//input[@type=\'submit\']'
+                user_xpath = '//*[@id=\'UserName\']'
+                pass_xpath = '//*[@id=\'Password\']'
+                self.add_text(user_xpath, username, 'Username')
+                self.add_text(pass_xpath, password, 'Password')
+                
+                keep_going = True
+                Checking = True
+                while keep_going == True:
+                    try:
+                        username_field = browser.find_element(By.XPATH, submit_xpath)
+                        username_field.click()
+                        print('Submit button clicked')
+                        keep_going = False
+                    except WebDriverException:
+                        if Checking == True:
+                            print('Submit button not Clicked')
+                            Checking = False
+            account_list_dict = {}
+            for crnt_client in account_list:
+                print('Processing Client : ', crnt_client)
+                ind = int(df[df['Account'] == crnt_client].index[0]) + 2
+                search_field_xpath = '//input[@type=\'search\']'
+                self.add_text(search_field_xpath, crnt_client, 'Searching account')
+                xpath_list_reponse = '//ul[@id=\'select2-company-selector-results\']'
+                keep_going = True
+                Checking = True
+                while keep_going == True:
+                    try:
+                        ul_element = browser.find_element(By.XPATH, xpath_list_reponse)
+                        print('Response Fetched')
+                        keep_going = False
+                    except WebDriverException:
+                        if Checking == True:
+                            print('Response not Fetched')
+                            Checking = False
+                li_elements = ul_element.find_elements(By.XPATH, './li')
+                if run_st == 'No':
+                    crnt_client_check = 'Stage ' + crnt_client
+                else:
+                    crnt_client_check = crnt_client
+                main_page = browser.current_window_handle
+                found = 'No'
+                for li in li_elements:
+                    if li.text == crnt_client_check:
+                        found = 'Yes'
+                        li.click()
+                        self.window_switch(main_page)
+                        keep_going = True
+                        Checking = True
+                        while keep_going == True:
+                            try:
+                                txt_entire = browser.find_element(By.XPATH, '/html/body').get_attribute('innerText')
+                                print('Fetching entirepage text')
+                                keep_going = False
+                            except WebDriverException:
+                                if Checking == True:
+                                    print('Fetching entirepage text')
+                                    Checking = False
+                        if 'An Error Has Occurred' in txt_entire:
+                            browser.close()
+                            browser.switch_to.window(main_page)
+                            sheet.range('B' + str(ind)).value = 'Error in Page'
+                        else:
+                            self.click_on_elem_byLinkText('Users', 'Usertext')
+                            self.click_on_elem_byLinkText('Manage', 'Manage Text')
+                            #Clicks on an element using its link text.
+                            filter_xpath = '//li[contains(@title, \'Open filters\')]'
+                            self.click_on_elem(filter_xpath, 'Filter ')
+                            suspended_xpath = '//div[@class=\'widget-row groups\']//div[contains(@class,\'field\') and @data-field=\'w_Suspended\' and text()=\'Show Suspended\']'
+                            keep_going = True
+                            Checking = True
+                            while keep_going == True:
+                                try:
+                                    suspend_val = browser.find_element(By.XPATH, suspended_xpath).get_attribute('class')
+                                    print('Suspended Status')
+                                    keep_going = False
+                                except WebDriverException:
+                                    if Checking == True:
+                                        print('Suspended Status not fetched')
+                                        Checking = False
+                            if suspend_val.strip().replace(' ', '') != 'fieldselected':
+                                self.click_on_elem(suspended_xpath, 'Suspended ')
+                            save_xpath = '//button[@class=\'btn btn-primary id-btn-save\' and @data-testid=\'id-btn-save\' and text()=\'Save\']'
+                            self.click_on_elem(save_xpath, 'Save ')
+                            toggle_xpath = '//div[contains(@class, \'filter-block\') and contains(@class, \'id-filter-w_Suspended\')]/span/span[@class=\'k-switch-track k-rounded-full\']'
+                            toggle2_xpath = '//div[contains(@class, \'filter-block\') and contains(@class, \'id-filter-w_Suspended\')]/span'
+                            keep_going = True
+                            Checking = True
+                            while keep_going == True:
+                                try:
+                                    toggle_val = browser.find_element(By.XPATH, toggle2_xpath).get_attribute('aria-checked')
+                                    print('Fetching Toggle Current Status')
+                                    keep_going = False
+                                except WebDriverException:
+                                    if Checking == True:
+                                        print('Fetching Toggle Current Status not fetched')
+                                        Checking = False
+                            if toggle_val == 'false':
+                                self.click_on_elem(toggle_xpath, 'Toggle ')
+                            action_xpath = '//*[@class=\'kg-record-action kg-columns-chooser\']'
+                            self.click_on_elem(action_xpath, 'Action ')
+                            last_login_xpath = '//div[@class=\'widget-row groups\']//div[contains(@class,\'field\') and @data-field=\'LastLogin\' and text()=\'Last Login\']'
+                            keep_going = True
+                            Checking = True
+                            while keep_going == True:
+                                try:
+                                    lastlogin_val = browser.find_element(By.XPATH, last_login_xpath).get_attribute('class')
+                                    print('Last Login Status')
+                                    keep_going = False
+                                except WebDriverException:
+                                    if Checking == True:
+                                        print('Last Login Status not fetched')
+                                        Checking = False
+                            if lastlogin_val.strip().replace(' ', '') != 'fieldselected':
+                                self.click_on_elem(last_login_xpath, 'last_login ')
+                            time.sleep(3)
+                            self.click_on_elem(save_xpath, 'Save ')
+                            folder_to_empty = download_folder
+                            self.empty_folder(folder_to_empty)
+                            #Empties a specified folder.
+                            if user.lower() == 'kenneth.manalong':
+                                export_xpath = '//li[@class=\'area-action background-border icon-exportToExcel\']'
+                                self.click_on_elem(export_xpath, 'Export ')
+                            else:
+                                xpath_maindrop = '//*[@class=\'page-actions\']//div[@class=\'main-action\']//span[@class=\'arrow\']'
+                                xpath_exp = '//li[@data-action=\'ManageEmployeesGrid_exportToExcel\']/a'
+                                self.click_on_elem(xpath_maindrop, 'Export dropdown ')
+                                self.click_on_elem(xpath_exp, 'Export Link ')
+                            found, filedownloaded = self.check_file_downlaoded(folder_to_empty)
+                            sheet_tool.range('F8').value = crnt_client
+                            sheet_tool.range('F10').value = flagged_path
+                            sheet_tool.range('F11').value = filedownloaded
+                            wb.save()
+                            self.macro_call(wb)
+                            
+                            browser.close()
+                            browser.switch_to.window(main_page)
+                            sheet.range('B' + str(ind)).value = 'Found & Processed'
+                if found == 'No':
+                    sheet.range('B' + str(ind)).value = 'Not Found'
+
+    def macro_call(self, wb):
+        macro_mail = wb.macro('Final.final_post_run')
+        macro_mail()
+
+    def check_file_downlaoded(self, folder_path):
+        keep_going = True
+        while keep_going == True:
+            files = os.listdir(folder_path)
+            found = 'No'
+            print(files)
+            for file in files:
+                if file.endswith('.xlsx'):
+                    filedownloaded = os.path.join(folder_path, file)
+                    found = 'Yes'
+                    keep_going = False
+                    break
+        return (found, filedownloaded)
+
+    def empty_folder(self, folder_path):
+        for item in os.listdir(folder_path):
+            item_path = os.path.join(folder_path, item)
+            try:
+                if os.path.isfile(item_path):
+                    os.unlink(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+            except Exception as e:
+                print(f'Error deleting {item_path}: {e}')
+
+    def account_list_prep(self, file):
+        df = pd.read_excel(file, sheet_name='Input')
+        df_mapping = pd.read_excel(file, sheet_name='Mapping')
+        merged_df = pd.merge(df, df_mapping, on='Account', how='left')
+        
+        merged_df['Account'] = merged_df['Name in Corrigo'].fillna(merged_df['Account'])
+        result_df = merged_df.drop(columns=['Name in Corrigo'])
+        df_backup = result_df
+        result_df_v1 = result_df.loc[result_df['Status'].isnull() | (result_df['Status'] == 'Not Found')]
+        account_list = result_df_v1['Account'].to_list()
+        return (account_list, df_backup)
+
+    def click_on_elem(self, submit_xpath, text):
+        keep_going = True
+        Checking = True
+        while keep_going == True:
+            try:
+                username_field = browser.find_element(By.XPATH, submit_xpath)
+                username_field.click()
+                print(text + ' button clicked')
+                keep_going = False
+            except WebDriverException:
+                if Checking == True:
+                    print(text + ' button not Clicked')
+                    Checking = False
+
+    def click_on_elem_byLinkText(self, linktext, text):
+        keep_going = True
+        Checking = True
+        while keep_going == True:
+            try:
+                field = browser.find_element(By.LINK_TEXT, linktext)
+                field.click()
+                print(text + ' button clicked')
+                keep_going = False
+            except WebDriverException:
+                if Checking == True:
+                    print(text + ' button not Clicked')
+                    Checking = False
+
+    def window_switch(self, main_page):
+        for handle in browser.window_handles:
+            if handle != main_page:
+                print(handle)
+                newpage = handle
+                break
+        browser.switch_to.window(newpage)
+        
+
+    def add_text(self, xpath, value, message):
+        keep_going = True
+        Checking = True
+        while keep_going == True:
+            try:
+                password_field = browser.find_element(By.XPATH, xpath)
+                password_field.clear()
+                password_field.send_keys(value)
+                print(message, ' Fetched')
+                keep_going = False
+            except WebDriverException:
+                if Checking == True:
+                    print(message, ' not Fetched')
+                    Checking = False
+                    
+
+
+
+    def inputprep(self, inputfile):
+        df = pd.read_excel(inputfile, sheet_name='in-out scope', header=1)
+        input_account = df[df['Inactive user'] == 'Yes']['Company Name'].to_list()
+        return input_account
+    
+
+
+
+    def login_Corrigo(self, res_dict_config, fldpath, download_folder):
+        global browser
+        self.create_directory(download_folder)
+        APPLICATION_URL = res_dict_config['url']
+        options = webdriver.ChromeOptions() 
+        options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options = Options()
+        prefs = {'download.default_directory': download_folder}
+        options.add_experimental_option('prefs', prefs)
+        exe_path = os.path.join(fldpath, 'Chrome\\chromedriver.exe')
+        print(exe_path)
+        executable_path_1 = exe_path
+        service = Service(executable_path_1)
+        browser = webdriver.Chrome(service=service, options=options)
+        print('Current session is {}'.format(browser.session_id))
+        browser.maximize_window()
+        main_window = browser.current_window_handle
+        browser.switch_to.window(main_window)
+        browser.get(APPLICATION_URL)
+        return browser
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = FileAndFolderSelector()
+    window.show()
+    sys.exit(app.exec_())
+
+
