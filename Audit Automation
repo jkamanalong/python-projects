@@ -135,15 +135,15 @@ class FileAndFolderSelector(QWidget):
         root = tree.getroot()
         
         run_st = ''
-        overall_environment = root.find('./prod_use')
+        overall_environment = root.find('confidential')
         for node2 in overall_environment.iter():
             run_st = node2.text
         if run_st == 'No':
-            qa_environment = root.find('./environment[@name=\'QA\']')
+            qa_environment = root.find('confidential')
             
         else:
             if run_st == 'Yes':
-                qa_environment = root.find('./environment[@name=\'dev\']')
+                qa_environment = root.find('confidential')
         qa_nodes = {}
         for node in qa_environment.iter():
             qa_nodes[node.tag] = node.text
@@ -156,8 +156,8 @@ class FileAndFolderSelector(QWidget):
     def print_values(self):
         user = getpass.getuser() 
         fldpath = os.path.dirname(os.path.abspath(__file__)) 
-        Configfilefodler_folder = os.path.join(fldpath, 'config')
-        config_file = os.path.join(Configfilefodler_folder, 'Corrigo.xml')
+        Configfilefodler_folder = os.path.join(fldpath, 'confidential')
+        config_file = os.path.join(Configfilefodler_folder, 'confidential')
         dict_config = {}
         res_dict_config, run_st = self.reading_config_file(config_file, dict_config) 
         file = self.file_path_input.text()
@@ -171,10 +171,10 @@ class FileAndFolderSelector(QWidget):
         file_name = os.path.basename(macrofile_path)
         new_file_name1 = 'Output1_' + file_name
         new_file_name = 'Output2_' + file_name
-        new_file_name3 = 'Status.xlsx'
-        ignore_filename = 'InvoiceTo'
-        ignore_filename = 'InvoiceToIgnore.xlsx'
-        macro_filename = 'Cleaning Tool.xlsm'
+        new_file_name3 = 'confidential'
+        ignore_filename = 'confidential'
+        ignore_filename = 'confidential'
+        macro_filename = 'confidential'
         output_path = os.path.join(os.path.dirname(macrofile_path), 'Output')
         ignorefile_path = os.path.join(os.getcwd(), 'Ignorelist')
         ignore_file = os.path.join(ignorefile_path, ignore_filename)
@@ -186,12 +186,12 @@ class FileAndFolderSelector(QWidget):
             download_folder = os.path.join(fldpath, 'Downloaded Reports')
             self.login_Corrigo(res_dict_config, fldpath, download_folder)
             #Logs into the Corrigo system.
-            if user.lower() == 'kenneth.manalong': #Testing purposes
-                username = 'sample.user@jll.com'
-                password = 'sample_stagepassword123'
-                submit_xpath = '//input[@type=\'submit\']'
-                user_xpath = '//*[@id=\'UserName\']'
-                pass_xpath = '//*[@id=\'Password\']'
+            if user.lower() == 'confidential': #Testing purposes
+                username = 'confidential'
+                password = 'confidential'
+                submit_xpath = 'confidential'
+                user_xpath = 'confidential'
+                pass_xpath = 'confidential'
                 self.add_text(user_xpath, username, 'Username')
                 self.add_text(pass_xpath, password, 'Password')
                 
@@ -211,9 +211,9 @@ class FileAndFolderSelector(QWidget):
             for crnt_client in account_list:
                 print('Processing Client : ', crnt_client)
                 ind = int(df[df['Account'] == crnt_client].index[0]) + 2
-                search_field_xpath = '//input[@type=\'search\']'
+                search_field_xpath = 'confidential'
                 self.add_text(search_field_xpath, crnt_client, 'Searching account')
-                xpath_list_reponse = '//ul[@id=\'select2-company-selector-results\']'
+                xpath_list_reponse = 'confidential'
                 keep_going = True
                 Checking = True
                 while keep_going == True:
@@ -241,7 +241,7 @@ class FileAndFolderSelector(QWidget):
                         Checking = True
                         while keep_going == True:
                             try:
-                                txt_entire = browser.find_element(By.XPATH, '/html/body').get_attribute('innerText')
+                                txt_entire = browser.find_element(By.XPATH, 'confidential')
                                 print('Fetching entirepage text')
                                 keep_going = False
                             except WebDriverException:
@@ -256,9 +256,9 @@ class FileAndFolderSelector(QWidget):
                             self.click_on_elem_byLinkText('Users', 'Usertext')
                             self.click_on_elem_byLinkText('Manage', 'Manage Text')
                             #Clicks on an element using its link text.
-                            filter_xpath = '//li[contains(@title, \'Open filters\')]'
+                            filter_xpath = 'confidential'
                             self.click_on_elem(filter_xpath, 'Filter ')
-                            suspended_xpath = '//div[@class=\'widget-row groups\']//div[contains(@class,\'field\') and @data-field=\'w_Suspended\' and text()=\'Show Suspended\']'
+                            suspended_xpath = 'confidential'
                             keep_going = True
                             Checking = True
                             while keep_going == True:
@@ -272,10 +272,10 @@ class FileAndFolderSelector(QWidget):
                                         Checking = False
                             if suspend_val.strip().replace(' ', '') != 'fieldselected':
                                 self.click_on_elem(suspended_xpath, 'Suspended ')
-                            save_xpath = '//button[@class=\'btn btn-primary id-btn-save\' and @data-testid=\'id-btn-save\' and text()=\'Save\']'
+                            save_xpath = 'confidential'
                             self.click_on_elem(save_xpath, 'Save ')
-                            toggle_xpath = '//div[contains(@class, \'filter-block\') and contains(@class, \'id-filter-w_Suspended\')]/span/span[@class=\'k-switch-track k-rounded-full\']'
-                            toggle2_xpath = '//div[contains(@class, \'filter-block\') and contains(@class, \'id-filter-w_Suspended\')]/span'
+                            toggle_xpath = 'confidential'
+                            toggle2_xpath = 'confidential'
                             keep_going = True
                             Checking = True
                             while keep_going == True:
@@ -289,9 +289,9 @@ class FileAndFolderSelector(QWidget):
                                         Checking = False
                             if toggle_val == 'false':
                                 self.click_on_elem(toggle_xpath, 'Toggle ')
-                            action_xpath = '//*[@class=\'kg-record-action kg-columns-chooser\']'
+                            action_xpath = 'confidential'
                             self.click_on_elem(action_xpath, 'Action ')
-                            last_login_xpath = '//div[@class=\'widget-row groups\']//div[contains(@class,\'field\') and @data-field=\'LastLogin\' and text()=\'Last Login\']'
+                            last_login_xpath = 'confidential'
                             keep_going = True
                             Checking = True
                             while keep_going == True:
@@ -310,12 +310,12 @@ class FileAndFolderSelector(QWidget):
                             folder_to_empty = download_folder
                             self.empty_folder(folder_to_empty)
                             #Empties a specified folder.
-                            if user.lower() == 'kenneth.manalong':
-                                export_xpath = '//li[@class=\'area-action background-border icon-exportToExcel\']'
+                            if user.lower() == 'confidential':
+                                export_xpath = 'confidential'
                                 self.click_on_elem(export_xpath, 'Export ')
                             else:
-                                xpath_maindrop = '//*[@class=\'page-actions\']//div[@class=\'main-action\']//span[@class=\'arrow\']'
-                                xpath_exp = '//li[@data-action=\'ManageEmployeesGrid_exportToExcel\']/a'
+                                xpath_maindrop = 'confidential'
+                                xpath_exp = 'confidential'
                                 self.click_on_elem(xpath_maindrop, 'Export dropdown ')
                                 self.click_on_elem(xpath_exp, 'Export Link ')
                             found, filedownloaded = self.check_file_downlaoded(folder_to_empty)
