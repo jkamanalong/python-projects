@@ -127,11 +127,6 @@ def browse_folder(var): #folderDialog
    folder = filedialog.askdirectory()
    var.set(folder)
 
-def get_login_details():
-    username = simpledialog.askstring("Login Failed", "Enter Login ID:")
-    password = simpledialog.askstring("Login Failed", "Enter Password:", show='*')
-    return username, password
-
 def get_macro_details():
    macro_module = simpledialog.askstring("Enter Macro Module Name:")
    macro_name = simpledialog.askstring("Enter Macro Name:")
@@ -149,7 +144,7 @@ def process_accounts_with_selenium(account_file, folder_path, default_download_d
    driver = None
    while counter < MAX_ATTEMPTS and not login_successful:
      driver = webdriver.Chrome()
-     driver.get("https://servicecenter.corrigo.com/")
+     driver.get("Confidential")
      time.sleep(3)
      
      # Wait for the user to input credentials and click submit
@@ -160,7 +155,7 @@ def process_accounts_with_selenium(account_file, folder_path, default_download_d
      try:
          # Wait for an element that appears only after successful login
          wait = WebDriverWait(driver, 300)  # 5 minutes timeout
-         element = wait.until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/div[1]/div/div/ul/li[3]/button/span[1]")))
+         element = wait.until(EC.visibility_of_element_located((By.XPATH, "Confidential")))
          print("Login successful!")
          login_successful = True
      except TimeoutException:
@@ -181,15 +176,15 @@ def process_accounts_with_selenium(account_file, folder_path, default_download_d
 
 
    #SC NAVIGATION
-   production_button = driver.find_element(By.XPATH, '/html/body/div[1]/div[1]/div/div/ul/li[3]/button/span[1]')
+   production_button = driver.find_element(By.XPATH, "Confidential")
    production_button.click()
    time.sleep(3)
-   production_secondbutton = driver.find_element(By.XPATH, '/html/body/div[1]/div[1]/div/div/ul/li[3]/ul/li[1]/a/span')
+   production_secondbutton = driver.find_element(By.XPATH, "Confidential")
    production_secondbutton.click()
    time.sleep(3)
    wait = WebDriverWait(driver, 10)
-   element = wait.until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div/div/div/div[2]/span/span[1]/span/ul/li/input")))
-   element = driver.find_element(By.XPATH, '/html/body/div[1]/div[2]/div/div/div/div[2]/span/span[1]/span/ul/li/input')
+   element = wait.until(EC.visibility_of_element_located((By.XPATH, "Confidential")))
+   element = driver.find_element(By.XPATH, "Confidential")
    element.click()
    time.sleep(3)
 
@@ -213,7 +208,7 @@ def process_accounts_with_selenium(account_file, folder_path, default_download_d
             try:
                 # Wait for a new element that appears only after redirection
                 WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'page-title') and //text()='My Dashboard']"))
+                    EC.presence_of_element_located((By.XPATH, "Confidential"))
                 ) #Checks if there is "My Dashboard"
                 print(f"Successfully redirected for account: {account_name}")
             except Exception as e:
@@ -227,15 +222,14 @@ def process_accounts_with_selenium(account_file, folder_path, default_download_d
             print(account_name + ' : ' + url)
 
             dynamic_part =(lambda x: x.lower())(url).split('/common/')[0]
-            new_url = dynamic_part + '/common/importexport.aspx'
+            new_url = dynamic_part + '"Confidential"'
             time.sleep(5)
             driver.execute_script("window.location.href = arguments[0]", new_url) #Opens a new window for the revised link
             time.sleep(2)
             
-            #//div[@class="_pendo-step-container-size"]//button[@class="_pendo-close-guide"]
             try:
                pendo_close_button = WebDriverWait(driver, 5).until(
-                   EC.presence_of_element_located((By.XPATH, '//div[@class="_pendo-step-container-size"]//button[@class="_pendo-close-guide"]')))
+                   EC.presence_of_element_located((By.XPATH, "Confidential")))
                pendo_close_button.click()
                print("Closed Pendo guide.")
             except TimeoutException:
@@ -245,14 +239,14 @@ def process_accounts_with_selenium(account_file, folder_path, default_download_d
             time.sleep(2)
             # SEARCHBAR
             print(f"Typing in {search_query} in the search bar")
-            searchbar = wait.until(EC.visibility_of_element_located((By.XPATH, '//div[contains(@class,"filter-block")]//input[@type="text"]')))
-            searchbar = driver.find_element(By.XPATH, '//div[contains(@class,"filter-block")]//input[@type="text"]')
+            searchbar = wait.until(EC.visibility_of_element_located((By.XPATH, "Confidential")))
+            searchbar = driver.find_element(By.XPATH, "Confidential")
             searchbar.clear()
             searchbar.send_keys(search_query)
             searchbar.send_keys(Keys.RETURN)
             time.sleep(7)
 
-            selector = '//tr[@class="k-table-row k-master-row"][1]//td[@class="actions-cell k-table-td"]//div[@class="kg-record-action kg-download"]' #The export button
+            selector = "Confidential" #The export button
             # Using ActionChains to hover over the element and reveal the actions underneath.
             actions = ActionChains(driver)
             element_to_hover_over = driver.find_element(By.XPATH,selector)
@@ -262,7 +256,7 @@ def process_accounts_with_selenium(account_file, folder_path, default_download_d
             actions.perform()
 
             # Now you can perform the click (or any other action) on the revealed element
-            sub_element = wait.until(EC.presence_of_element_located((By.XPATH, '//tr[@class="k-table-row k-master-row"][1]//td[@class="actions-cell k-table-td"]//div[@class="kg-record-action kg-download"]')))
+            sub_element = wait.until(EC.presence_of_element_located((By.XPATH, "Confidential")))
             sub_element.click()
 
             #Initializing the download directory
@@ -273,22 +267,22 @@ def process_accounts_with_selenium(account_file, folder_path, default_download_d
             
             print("Checking if there is a window pop-up")
 
-            #//div[@class="modal-scrollable"]//div[@class="modal-body"]//form[@class="id-download-dialog corrigo-form"]//span[@class="k-input-button k-button k-button-md k-button-solid k-button-solid-base k-icon-button"]
-            #//div[@class="modal-scrollable"]//div[@class="modal-body"]//form[@class="id-download-dialog corrigo-form"]//span[@class="k-input-value-text"]
+            "Confidential"
+            "Confidential"
             try:
                print("Finding Dropdown")
                portfolio_button = WebDriverWait(driver, 3).until(
-                   EC.element_to_be_clickable((By.XPATH, '//div[@class="widget-control"]//span[@class="k-input-inner"]//span[@class="k-input-value-text"]'))
+                   EC.element_to_be_clickable((By.XPATH, "Confidential"))
                    )
                '''print("Clicking Dropdown")
                portfolio_button.click()
                print("Finding Portfolio")
-               option_click=driver.find_element(By.XPATH, "//span[text()='Portfolio']")
+               option_click=driver.find_element(By.XPATH, "Confidential")
                print("Clicking Portfolio")
                option_click.click()'''
                print("Clicking through portfolio options")
                dropdown_element = WebDriverWait(driver, 3).until(
-                   EC.element_to_be_clickable((By.XPATH, '//span[@class="k-input-inner control-label"]'))
+                   EC.element_to_be_clickable((By.XPATH, "Confidential"))
                    )
                dropdown_element.click()
 
@@ -302,18 +296,18 @@ def process_accounts_with_selenium(account_file, folder_path, default_download_d
                
                print(f"Typing in {user_portfolio}")
                search_bar = WebDriverWait(driver, 3).until(
-                  EC.element_to_be_clickable((By.XPATH, '//div[@class="search-box-container"]//input[@class="corrigo-text-field"]'))
+                  EC.element_to_be_clickable((By.XPATH, "Confidential"))
                   )
                search_bar.send_keys(user_portfolio)
                time.sleep(5)
                print("Clicking the 1st option")
                first_result = WebDriverWait(driver, 3).until(
-                   EC.element_to_be_clickable((By.XPATH, '//div[@class="k-animation-container k-animation-container-shown"]//div[@class="k-list-container corrigo-inputs"]//li[@class="k-item"][1]'))
+                   EC.element_to_be_clickable((By.XPATH, "Confidential"))
                    )
                first_result.click()
                dropdown_element.click()
                export_second = WebDriverWait(driver, 3).until(
-                   EC.element_to_be_clickable((By.XPATH, '//div[@class="modal-footer"]//div[@class="right"]//button[@class="btn btn-primary id-btn-save"]'))
+                   EC.element_to_be_clickable((By.XPATH, "Confidential"))
                    )
                export_second.click()
         
@@ -401,17 +395,7 @@ def runMacro(macro_file_path, one_user_one_role_ref):
         wb_macro = xl.Workbooks.Open(macro_file_path_value)
         macro_book_name = os.path.basename(macro_file_path_value)
 
-        #------------------Code block written only for Roles Checking-----#
-        '''
-        print(f"Checking for presence of Results Sheet")
-        # Ensure "Results" sheet exists in macro file
-        if "Results" not in [sheet.Name for sheet in wb_macro.Sheets]:
-            wb_macro.Sheets.Add().Name = "Results"
-            print(f"Added Results Sheet")
-        results_sheet = wb_macro.Sheets("Results")
-        print(f"Results Sheet Present")
-        '''
-        #------------------Code block written only for Roles Checking-----#
+      
         
         for file_name in file_list:
             file_path = os.path.join(folder_path_value, file_name).replace('\\', '/')
