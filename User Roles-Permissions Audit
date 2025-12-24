@@ -169,7 +169,7 @@ class Auditor(QWidget):
 
         #Auto navigation starts here
         if len(account_list)>0:
-            res_dict_config = {"url": "https://login.corrigo.com/connect/login?client_id=servicecenter"}
+            res_dict_config = {"url": "Confidential"}
             run_st = "Yes"
             # Rename download folder to "Processing Folder"
             processing_folder = os.path.join(fldpath, 'Processing Folder')
@@ -199,9 +199,9 @@ class Auditor(QWidget):
             self.create_directory(reports_folder)
             
             self.login_Corrigo(res_dict_config, fldpath, processing_folder)
-            drop_down = "//span[@class='caret big-caret ']"
+            drop_down = "Confidential"
             self.click_on_elem(drop_down,'Drop-down selector')
-            sys_ad = "//span[@title='JLL NA Governance System Admin']"
+            sys_ad = "Confidential"
             self.click_on_elem(sys_ad,"Sys Admin")
             all_results = {
             "privileges": [],
@@ -212,11 +212,11 @@ class Auditor(QWidget):
             all_table_data = []
             for account in account_list:
                 print('Processing Account : ', account)
-                search_field_xpath = '//input[@type=\'search\']'
+                search_field_xpath = "Confidential"
                 self.add_text(search_field_xpath, account, 'Searching account')
-                #//div[@class='select-option-text' and contains(text(), 'JLL British Telecom')]
-                xpath_reponse = '//div[@class=\'select-option-text\' and contains(text(),\''+account+'\')]'
-                xpath_noresult = '//div[@class=\'no-result-found\']'
+                "Confidential"
+                xpath_reponse = "Confidential"
+                xpath_noresult = "Confidential"
                 try:
                     if browser.find_element(By.XPATH, xpath_noresult):
                         continue
@@ -232,7 +232,7 @@ class Auditor(QWidget):
                 Checking = True
                 while keep_going == True:
                     try:
-                        txt_entire = browser.find_element(By.XPATH, '/html/body').get_attribute('innerText')
+                        txt_entire = browser.find_element(By.XPATH, "Confidential")
                         print('Fetching entirepage text')
                         keep_going = False
                     except WebDriverException:
@@ -245,7 +245,7 @@ class Auditor(QWidget):
                     error_one = 'Error in Page'
                     continue
                 else:
-                    close_pendo = "//button[@class='btn btn-default id-btn-close']"
+                    close_pendo = "Confidential"
                     try:
                         time.sleep(5)
                         if browser.find_element(By.XPATH, close_pendo):
@@ -255,41 +255,41 @@ class Auditor(QWidget):
 
                     try:
                         time.sleep(1)
-                        if browser.find_element(By.LINK_TEXT, 'More'):
-                            self.click_on_elem_byLinkText('More','More text')
+                        if browser.find_element(By.LINK_TEXT, "Confidential"):
+                            self.click_on_elem_byLinkText("Confidential")
                     except Exception as e:
                         print('No more field found: ' + str(e))
 
                     # Empty the processing folder but save files to Reports folder before deletion
                     self.empty_folder(processing_folder)
                     
-                    self.click_on_elem_byLinkText('Admin & Settings', 'Admin Settings')
-                    self.click_on_elem_byLinkText('Users and Roles', 'Users and Roles')
-                    self.click_on_elem_byLinkText('Manage Roles', 'Manage Roles')
+                    self.click_on_elem_byLinkText("Confidential")
+                    self.click_on_elem_byLinkText("Confidential")
+                    self.click_on_elem_byLinkText("Confidential")
 
                     # First export
-                    self.click_on_elem('//div/span[@class=\'arrow\']', 'Dropdown')
-                    self.click_on_elem('//li/a/span[@class=\'area-action icon-download\' and @data-action=\'RoleGrid_export_roles\']', 'Roles Export Button')
+                    self.click_on_elem("Confidential")
+                    self.click_on_elem("Confidential")
                     time.sleep(3)
                     # Check for internal server error after first export
                     try:
                         time.sleep(5)
-                        error_element = browser.find_element(By.XPATH, "//*[contains(text(), 'Internal Server Error')]")
+                        error_element = browser.find_element(By.XPATH, "Confidential")
                         print('Internal Server Error encountered for Roles Export, but proceeding...')
-                        self.click_on_elem('//button[@class=\'btn btn-default id-btn-close\']','Close')
+                        self.click_on_elem("Confidential")
                     except Exception:
                         print('No error for Roles Export')                    
 
                     # Second export
-                    self.click_on_elem('//div/span[@class=\'arrow\']', 'Dropdown')
-                    self.click_on_elem('//li/a/span[@class=\'area-action icon-download\' and @data-action=\'RoleGrid_export_invoice_statuses\']', 'AP Statuses Export Button')
+                    self.click_on_elem("Confidential")
+                    self.click_on_elem("Confidential")
                     time.sleep(3)
                     # Check for internal server error after second export
                     try:
                         time.sleep(5)
-                        error_element = browser.find_element(By.XPATH, "//*[contains(text(), 'Internal Server Error')]")
+                        error_element = browser.find_element(By.XPATH, "Confidential")
                         print('Internal Server Error encountered for AP Status Export, but proceeding...')
-                        self.click_on_elem('//button[@class=\'btn btn-default id-btn-close\']','Close')
+                        self.click_on_elem("Confidential")
                     except Exception:
                         print('No error for AP Status Export')
                     time.sleep(3)
@@ -308,9 +308,9 @@ class Auditor(QWidget):
                     found, filedownloaded = self.check_file_downlaoded(processing_folder, account)
                     print(filedownloaded)
 
-                    fnamerole = 'CorrigoRoleData'
-                    fnameapstatus = 'CorrigoLnkRoleApStatusData'
-                    fnameusers = 'CorrigoEmployeeData'
+                    fnamerole = '"Confidential"'
+                    fnameapstatus = '"Confidential"'
+                    fnameusers = '"Confidential"'
 
                     # Check if there are any downloaded files
                     if not filedownloaded:
@@ -420,27 +420,27 @@ class Auditor(QWidget):
         
         try:
             time.sleep(2)
-            if browser.find_element(By.LINK_TEXT, 'More'):
-                self.click_on_elem_byLinkText('More','More text')
+            if browser.find_element(By.LINK_TEXT, "Confidential"):
+                self.click_on_elem_byLinkText('More',"Confidential")
         except Exception as e:
             print('No \'More\' field found: ' + str(e))
 
-        self.click_on_elem_byLinkText('Admin & Settings', 'Admin Settings')
-        self.click_on_elem('//a[contains(text(),\'Service Pros\') and @data-type=\'3\']', 'Service Pros')
-        self.click_on_elem_byLinkText('Settings', 'Settings')
+        self.click_on_elem_byLinkText("Confidential")
+        self.click_on_elem("Confidential")
+        self.click_on_elem_byLinkText('"Confidential")
 
         time.sleep(2)
 
         # Title Cells Service Pro Settings
-        t_01 = '//td[@class=\'gc-WonWorkflowAndRequirementsSettingsFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Require unique invoice #\')]'
-        t_02 = '//td[@class=\'gc-WonWorkflowAndRequirementsSettingsFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Require financial coding\')]'
+        t_01 = "Confidential"
+        t_02 = "Confidential"
 
         title_first_page = [t_01, t_02]
 
         for title_cell_xpath in title_first_page:
             try:
                 title_field = browser.find_element(By.XPATH, title_cell_xpath)
-                value_xpath = './following-sibling::td[@class=\'gc-WonWorkflowAndRequirementsSettingsFpoGrid-settingsValue left type-grid_string type-url type-styled  k-table-td\' and @aria-colindex=\'2\']'
+                value_xpath = './following-sibling::"Confidential"
                 value_field = title_field.find_element(By.XPATH, value_xpath)
                 title_text = title_field.text
                 value_text = value_field.text
@@ -461,7 +461,7 @@ class Auditor(QWidget):
             keyboard.press_and_release('ctrl+f')
             time.sleep(1)
             # Type in search text
-            keyboard.write('Required documents status for invoice submission')
+            keyboard.write('"Confidential"')
             time.sleep(1)
             keyboard.press_and_release('enter')
             time.sleep(1)
@@ -469,7 +469,7 @@ class Auditor(QWidget):
             screenshot = browser.get_screenshot_as_png()
             # Save screenshot
             img = Image.open(BytesIO(screenshot))
-            screenshot_path = os.path.join(screenshot_folder, f"{acc}_Service_Pro_Settings.png")
+            screenshot_path = os.path.join(screenshot_folder, f"{acc}"Confidential".png")
             img.save(screenshot_path)
             print(f"Screenshot saved to {screenshot_path}")
         except Exception as e:
@@ -478,33 +478,33 @@ class Auditor(QWidget):
         # Navigate to Global Configuration
         try:
             time.sleep(2)
-            if browser.find_element(By.LINK_TEXT, 'More'):
-                self.click_on_elem_byLinkText('More','More text')
+            if browser.find_element(By.LINK_TEXT, '"Confidential"'):
+                self.click_on_elem_byLinkText('More',"Confidential")
         except Exception as e:
             print('No more field found: ' + str(e))
 
-        self.click_on_elem_byLinkText('Admin & Settings', 'Admin Settings')
-        self.click_on_elem_byLinkText('Global Configuration', 'Global Configuration')
-        self.click_on_elem_byLinkText('Settings & Terminology', 'Settings & Terminology')
+        self.click_on_elem_byLinkText('Admin & Settings', "Confidential")
+        self.click_on_elem_byLinkText('Global Configuration', "Confidential")
+        self.click_on_elem_byLinkText('Settings & Terminology', "Confidential")
 
         time.sleep(2)
         
         # Title Cells Global Settings
-        t_03 = '//td[@class=\'gc-FinancialSettingsFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Role restriction on financial statuses\')]'
-        t_04 = '//td[@class=\'gc-FinancialSettingsFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Restrict creator from authorizing\')]'
-        t_05 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Expiration\')]'
-        t_06 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Length\')]'
-        t_07 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Disallow past\')]'
-        t_08 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Complexity\')]'
-        t_09 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Max attempts\')]'
-        t_10 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Lockout time\')]'
-        t_11 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Session timeout\')]'
-        t_12 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Admin sets temp password\')]'
-        t_13 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Role restrictions through ranking\')]'
-        t_14 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Require email address\')]'
-        t_15 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Password expiration alert\')]'
-        t_16 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Send password expiration alert\')]'
-        t_17 = '//td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingTitle left type-grid_string  k-table-td\' and contains(text(),\'Password expiration content\')]'
+        t_03 = "Confidential"
+        t_04 = "Confidential"
+        t_05 = "Confidential"
+        t_06 = "Confidential"
+        t_07 = "Confidential"
+        t_08 = "Confidential"
+        t_09 = "Confidential"
+        t_10 = "Confidential"
+        t_11 = "Confidential"
+        t_12 = "Confidential"
+        t_13 = "Confidential"
+        t_14 = "Confidential"
+        t_15 = "Confidential"
+        t_16 = "Confidential"
+        t_17 = "Confidential"
 
         title_second_page = [t_03, t_04, t_05, t_06, t_07, t_08, t_09, t_10, t_11, t_12, t_13, t_14, t_15, t_16, t_17]
 
@@ -514,9 +514,9 @@ class Auditor(QWidget):
                 
                 # Determine which xpath pattern to use for the value field
                 if 'FinancialSettingsFpoGrid' in title_cell_xpath:
-                    value_xpath = './following-sibling::td[@class=\'gc-FinancialSettingsFpoGrid-settingsValue left type-grid_string type-url type-styled  k-table-td\' and @aria-colindex=\'2\']'
+                    value_xpath = './following-sibling::"Confidential"
                 else:
-                    value_xpath = './following-sibling::td[@class=\'gc-UserPasswordRolePolicyFpoGrid-settingsValue left type-grid_string type-url type-styled  k-table-td\' and @aria-colindex=\'2\']'
+                    value_xpath = './following-sibling::"Confidential"
                     
                 value_field = title_field.find_element(By.XPATH, value_xpath)
                 title_text = title_field.text
@@ -552,20 +552,20 @@ class Auditor(QWidget):
         # Navigate to Global Configuration
         try:
             time.sleep(2)
-            if browser.find_element(By.LINK_TEXT, 'More'):
-                self.click_on_elem_byLinkText('More','More text')
+            if browser.find_element(By.LINK_TEXT, '"Confidential"'):
+                self.click_on_elem_byLinkText('"Confidential')
         except Exception as e:
             print('No more field found: ' + str(e))
 
-        self.click_on_elem_byLinkText('Admin & Settings', 'Admin Settings')
-        self.click_on_elem_byLinkText('Global Configuration', 'Global Configuration')
-        self.click_on_elem_byLinkText('Settings & Terminology', 'Settings & Terminology')
+        self.click_on_elem_byLinkText("Confidential")
+        self.click_on_elem_byLinkText("Confidential")
+        self.click_on_elem_byLinkText("Confidential")
 
         time.sleep(2)
         try:
             keyboard.press_and_release('ctrl+f')
             time.sleep(1)
-            keyboard.write('Lockout time')
+            keyboard.write("Confidential")
             time.sleep(1)
             keyboard.press_and_release('enter')
             time.sleep(1)
@@ -584,27 +584,27 @@ class Auditor(QWidget):
         """Export Admin Users data from the Import/Export section"""
         try:
             time.sleep(1)
-            if browser.find_element(By.LINK_TEXT, 'More'):
-                self.click_on_elem_byLinkText('More','More text')
+            if browser.find_element(By.LINK_TEXT, "Confidential"):
+                self.click_on_elem_byLinkText('More',"Confidential")
         except Exception as e:
             print('No more field found: ' + str(e))
             
         # Navigate to Import/Export
-        self.click_on_elem_byLinkText('Users', 'Users')
-        self.click_on_elem_byLinkText('Manage', 'Manage')
+        self.click_on_elem_byLinkText("Confidential")
+        self.click_on_elem_byLinkText("Confidential")
         time.sleep(2)
 
         #Click Dropdown arrow
-        arrow_drop = '//div[@class=\'area-actions-container area-actions-widget\']/div[@class=\'main-action\']/span[@class=\'arrow\']'
-        self.click_on_elem(arrow_drop, 'Drop-down arrow')
+        arrow_drop = "Confidential"
+        self.click_on_elem(arrow_drop, "Confidential")
 
         #Download File
-        export_xpath = '//a[contains(text(),\'Admin Export\')]/span[@class=\'area-action icon-download\']'
-        self.click_on_elem(export_xpath, 'Admin Export')
+        export_xpath = "Confidential"
+        self.click_on_elem(export_xpath, "Confidential")
 
         # Click Export button - use the click_on_elem method for consistency
-        export_butt = '//button[@class="btn btn-primary id-btn-save" and contains(text(), "Export")]'
-        self.click_on_elem(export_butt, 'Export Button')
+        export_butt = "Confidential"
+        self.click_on_elem(export_butt, "Confidential")
         
 
         try:
@@ -955,9 +955,9 @@ class Auditor(QWidget):
         
         # List of expected file patterns
         expected_patterns = [
-            "CorrigoRoleData",
-            "CorrigoLnkRoleApStatusData", 
-            "CorrigoEmployeeData"
+            "Confidential",
+            "Confidential", 
+            "Confidential"
         ]
         
         for file in files:
