@@ -121,7 +121,7 @@ class Auditor(QWidget):
         self.run_button.clicked.connect(self.print_values)
         self.run_button.setStyleSheet('background-color: #c1121f; color: white;')
         layout = QVBoxLayout(self)
-        self.title_label = QLabel('Corrigo Audit Automation Tool')
+        self.title_label = QLabel('Account Audit Automation Tool')
         self.title_label.setStyleSheet('font-size: 40px; background-color: white;')
         self.title_label.setAlignment(Qt.AlignHCenter)
         layout.addWidget(self.title_label)
@@ -129,7 +129,7 @@ class Auditor(QWidget):
         layout.addWidget(self.ref_file_path_input)
         layout.addWidget(self.ref_file_browse_button)
         layout.addWidget(self.run_button)
-        self.setWindowTitle('Corrigo Audit Automation Tool')
+        self.setWindowTitle('Account Audit Automation Tool')
         self.setFixedSize(800,700)
         self.setLayout(layout)
 
@@ -161,8 +161,8 @@ class Auditor(QWidget):
         bapfrom_dict, bapto_dict = self.baseline_apstatus_prep(ref_file, 'AP Status')
         #Baseline Data is established!!!
 
-        dosc_list = self.cpa_list_prep(ref_file,'DOSC') #SC Corrigo Platform Analyst
-        on_account_list = self.cpa_list_prep(ref_file,'On-account') #Corrigo Platform Analyst
+        dosc_list = self.cpa_list_prep(ref_file,'DOSC') #SC Account Platform Analyst
+        on_account_list = self.cpa_list_prep(ref_file,'On-account') #Account Platform Analyst
         sys_admins = self.cpa_list_prep(ref_file,'System admins') #SC Governance System Admin
         #CPA Data is established!!! These users are the only ones allowed to have CPA roles.
         
@@ -198,7 +198,7 @@ class Auditor(QWidget):
             reports_folder = os.path.join(fldpath, 'Reports')
             self.create_directory(reports_folder)
             
-            self.login_Corrigo(res_dict_config, fldpath, processing_folder)
+            self.login_Account(res_dict_config, fldpath, processing_folder)
             drop_down = "Confidential"
             self.click_on_elem(drop_down,'Drop-down selector')
             sys_ad = "Confidential"
@@ -847,7 +847,7 @@ class Auditor(QWidget):
             
         return (apfrom_dict, apto_dict)
 
-    def login_Corrigo(self, res_dict_config, fldpath, download_folder):
+    def login_Account(self, res_dict_config, fldpath, download_folder):
         global browser
         self.create_directory(download_folder)
         
@@ -1283,8 +1283,8 @@ class Auditor(QWidget):
         
         Args:
             p_users_role_dict: Dictionary mapping users to their assigned roles
-            dosc_list: List of users who should have 'SC Corrigo Platform Analyst' role
-            on_account_list: List of users who should have 'Corrigo Platform Analyst' role
+            dosc_list: List of users who should have 'SC Account Platform Analyst' role
+            on_account_list: List of users who should have 'Account Platform Analyst' role
             sys_admins: List of users who should have 'SC Governance System Admin' role
             account_name: Account name for reporting
             
@@ -1300,12 +1300,12 @@ class Auditor(QWidget):
             
             # Check Rule 1: Users in DOSC list
             if user in dosc_list:
-                expected_role = "SC Corrigo Platform Analyst"
+                expected_role = "SC Account Platform Analyst"
                 is_conforming = (role == expected_role)
             
             # Check Rule 2: Users in on-account list
             elif user in on_account_list:
-                expected_role = "Corrigo Platform Analyst"
+                expected_role = "Account Platform Analyst"
                 is_conforming = (role == expected_role)
             
             # Check Rule 3: Users in system admins
