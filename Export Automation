@@ -1,8 +1,8 @@
-# Export Automation Tool - For web based application (Corrigo)
+# Export Automation Tool - For web based application (Account)
 
 **Automated Data Export & Post-Processing for Web-Based Service Platform**
 
-A robust desktop automation tool built with **Python** that streamlines the extraction of custom reports from a web-based service management platform (Corrigo ServiceCenter) across multiple client accounts, followed by automated VBA macro processing.
+A robust desktop automation tool built with **Python** that streamlines the extraction of custom reports from a web-based service management platform (Account ServiceCenter) across multiple client accounts, followed by automated VBA macro processing.
 
 This "Export Automation" tool eliminates hours of repetitive manual navigation, exporting, and formatting — enabling fast, consistent data pulls for compliance, auditing, or reporting needs.
 
@@ -482,7 +482,7 @@ text_color = "#000000"
 
 # Creating GUI Elements
 # Add the header
-header = tk.Label(root, text="JLL UI Centric Automation - Corrigo Inactive Users", font=("Helvetica", 14, "bold"), bg=bg_color, fg=text_color, bd=2, relief="raised")
+header = tk.Label(root, text="JLL UI Centric Automation - Account Inactive Users", font=("Helvetica", 14, "bold"), bg=bg_color, fg=text_color, bd=2, relief="raised")
 header.grid(row=0, column=0, columnspan=3, pady=(20, 15))
 
 tk.Label(root, text="Search Query", anchor="w", bg=bg_color, fg=text_color, bd=1, relief="solid", width=23, font=("Verdana", 8)).grid(row=1, column=0, sticky="w", padx=(10, 0), pady=(10, 0))
