@@ -2,11 +2,11 @@
 
 **Automated User Audit Report Generation for a Web-Base Application Platform**
 
-A desktop GUI tool built with **Python**, **PyQt5**, **Selenium**, **xlwings**, and **Pandas** to automate the auditing of user accounts in the Corrigo work order management system.
+A desktop GUI tool built with **Python**, **PyQt5**, **Selenium**, **xlwings**, and **Pandas** to automate the auditing of user accounts in a work order management system.
 
 ### Purpose
 This tool streamlines a previously manual, time-consuming process:
-- Searches for inactive users in each Corrigo accounts
+- Searches for inactive users in each accounts
 - Applies specific filters (including suspended users and last login date)
 - Exports user reports to Excel
 - Runs post-processing Excel macros to flag issues
@@ -26,11 +26,11 @@ It significantly reduces audit time from hours to minutes per client.
 ### Key Libraries and Their Roles
 To understand how to write this script, you need to know the libraries it uses:
 - PyQt5: Creates a graphical user interface (GUI) with text fields, buttons, and labels for file/folder selection and running the automation.
-- Selenium: Automates web browser interactions (e.g., logging into Corrigo, clicking buttons, entering text, downloading files).
+- Selenium: Automates web browser interactions (e.g., logging into the account, clicking buttons, entering text, downloading files).
 - xlwings: Interacts with Excel files programmatically, including running macros and updating cell values.
 - pandas: Handles Excel data manipulation, such as reading and merging data from input files.
 - os, shutil, getpass, time: Manage file system operations (e.g., creating directories, deleting files), retrieve the current user, and introduce delays for web interactions.
-- xml.etree.ElementTree: Parses an XML configuration file (Corrigo.xml) to load environment-specific settings (e.g., URL, QA/dev environment).
+- xml.etree.ElementTree: Parses an XML configuration file (account.xml) to load environment-specific settings (e.g., URL, QA/dev environment).
 
 ### How to Run (Demo Instructions)
 1. Install dependencies:
@@ -84,7 +84,7 @@ class FileAndFolderSelector(QWidget):
         self.run_button.clicked.connect(self.print_values)
         self.run_button.setStyleSheet('background-color: #c1121f; color: white;')
         layout = QVBoxLayout(self) 
-        self.title_label = QLabel('Corrigo Audit Automation Tool')
+        self.title_label = QLabel('Accont Audit Automation Tool')
         self.title_label.setStyleSheet('background-color: white')
         self.title_label.setStyleSheet('font-size: 40px;')
         self.title_label.setAlignment(Qt.AlignHCenter)
@@ -103,7 +103,7 @@ class FileAndFolderSelector(QWidget):
         self.folder_browse_button.clicked.connect(self.get_folder_path)
         layout.addWidget(self.folder_browse_button)
         layout.addWidget(self.run_button)
-        self.setWindowTitle('Corrigo Audit Automation Tool') 
+        self.setWindowTitle('Account Audit Automation Tool') 
         self.setFixedSize(800, 700) 
         self.setLayout(layout)
 
@@ -184,8 +184,8 @@ class FileAndFolderSelector(QWidget):
             sheet = wb.sheets['Input']
             sheet_tool = wb.sheets['Tool']
             download_folder = os.path.join(fldpath, 'Downloaded Reports')
-            self.login_Corrigo(res_dict_config, fldpath, download_folder)
-            #Logs into the Corrigo system.
+            self.login_Account(res_dict_config, fldpath, download_folder)
+            #Logs into the Account system.
             if user.lower() == 'confidential': #Testing purposes
                 username = 'confidential'
                 password = 'confidential'
@@ -365,8 +365,8 @@ class FileAndFolderSelector(QWidget):
         df_mapping = pd.read_excel(file, sheet_name='Mapping')
         merged_df = pd.merge(df, df_mapping, on='Account', how='left')
         
-        merged_df['Account'] = merged_df['Name in Corrigo'].fillna(merged_df['Account'])
-        result_df = merged_df.drop(columns=['Name in Corrigo'])
+        merged_df['Account'] = merged_df['Name in Account'].fillna(merged_df['Account'])
+        result_df = merged_df.drop(columns=['Name in Account'])
         df_backup = result_df
         result_df_v1 = result_df.loc[result_df['Status'].isnull() | (result_df['Status'] == 'Not Found')]
         account_list = result_df_v1['Account'].to_list()
@@ -435,7 +435,7 @@ class FileAndFolderSelector(QWidget):
 
 
 
-    def login_Corrigo(self, res_dict_config, fldpath, download_folder):
+    def login_Account(self, res_dict_config, fldpath, download_folder):
         global browser
         self.create_directory(download_folder)
         APPLICATION_URL = res_dict_config['url']
